@@ -9,9 +9,18 @@
     let currentUserId = null;
     let useFirebase = false;
 
-    // Check if Firebase is available
+    // Check if Firebase is available and ready
     function checkFirebase() {
-      return typeof FirebaseAPI !== 'undefined' && typeof AuthManager !== 'undefined';
+      if (typeof FirebaseAPI === 'undefined' || typeof AuthManager === 'undefined') {
+        console.log('🔍 Firebase check: API not loaded');
+        return false;
+      }
+      if (typeof FirebaseAPI.isReady !== 'function' || !FirebaseAPI.isReady()) {
+        console.log('🔍 Firebase check: Not initialized yet');
+        return false;
+      }
+      console.log('✅ Firebase check: Ready');
+      return true;
     }
 
   function safeStorageGet(key) {

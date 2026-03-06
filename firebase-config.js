@@ -210,6 +210,7 @@ async function loadUserSettings(userId) {
 // ═══════════════════════════════════════════════════════════════
 window.FirebaseAPI = {
   initialize: initializeFirebase,
+  isReady: () => !!auth && !!db,
   auth: {
     signInWithGoogle,
     signOut,
@@ -225,3 +226,23 @@ window.FirebaseAPI = {
     loadSettings: loadUserSettings
   }
 };
+
+// ═══════════════════════════════════════════════════════════════
+// AUTO-INITIALIZE WHEN SCRIPT LOADS
+// ═══════════════════════════════════════════════════════════════
+console.log('🔥 Firebase Config: Initializing...');
+if (typeof firebase !== 'undefined') {
+  initializeFirebase();
+  console.log('✅ Firebase initialized in firebase-config.js');
+} else {
+  console.error('❌ Firebase SDK not loaded when firebase-config.js executed');
+  // Retry if Firebase loads later
+  const checkInterval = setInterval(() => {
+    if (typeof firebase !== 'undefined') {
+      clearInterval(checkInterval);
+      console.log('🔥 Firebase SDK detected, initializing...');
+      initializeFirebase();
+    }
+  }, 100);
+  setTimeout(() => clearInterval(checkInterval), 5000); // Stop checking after 5s
+}

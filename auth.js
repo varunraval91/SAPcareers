@@ -12,21 +12,34 @@
   // INITIALIZATION
   // ═══════════════════════════════════════════════════════════
   function initAuth() {
-    // Wait for Firebase to load
+    console.log('🔐 Auth: Checking Firebase...');
+    
+    // Wait for Firebase API and initialization
     if (typeof FirebaseAPI === 'undefined') {
-      console.error('Firebase not initialized');
-      showAuthError('Firebase not loaded. Check internet connection.');
+      console.error('❌ FirebaseAPI not available');
+      showAuthError('Firebase API not loaded.');
       return;
     }
 
+    // Wait for Firebase to actually be initialized
+    if (!FirebaseAPI.isReady || !FirebaseAPI.isReady()) {
+      console.warn('⏳ Firebase not ready yet, retrying in 500ms...');
+      setTimeout(initAuth, 500);
+      return;
+    }
+
+    console.log('✅ Firebase ready, initializing auth...');
+    
     // Listen to auth state changes
     FirebaseAPI.auth.onAuthStateChanged((user) => {
       if (user) {
         // User signed in
+        console.log('👤 User signed in:', user.email);
         currentUser = user;
         onUserSignedIn(user);
       } else {
         // User signed out
+        console.log('👤 User signed out');
         currentUser = null;
         onUserSignedOut();
       }
@@ -226,28 +239,28 @@
   // ═══════════════════════════════════════════════════════════
   async function loadUserData(userId) {
     try {
+      console.log('📦 Loading user data for:', userId);
       const applications = await FirebaseAPI.db.loadApplications(userId);
       
-      // Update app state
-      if (window.JobHuntApp && window.JobHuntApp.setApplications) {
-        window.JobHuntApp.setApplications(applications);
+      // Initialize app with userId and applications
+      if (window.JobHuntApp && window.JobHuntApp.init) {
+        console.log('🚀 Initializing app with', applications.length, 'applications');
+        window.JobHuntApp.init(userId, applications);
       }
 
       // Load settings
       const settings = await FirebaseAPI.db.loadSettings(userId);
-      if (settings.theme) {
-        if (window.JobHuntApp && window.JobHuntApp.setTheme) {
-          window.JobHuntApp.setTheme(settings.theme);
-        }
+      console.log('⚙️ Loaded settings:', settings);
+      
+      if (settings.theme && window.JobHuntApp && window.JobHuntApp.setTheme) {
+        window.JobHuntApp.setTheme(settings.theme);
       }
-      if (settings.weeklyGoal) {
-        if (window.JobHuntApp && window.JobHuntApp.setWeeklyGoal) {
-          window.JobHuntApp.setWeeklyGoal(settings.weeklyGoal);
-        }
+      if (settings.weeklyGoal && window.JobHuntApp && window.JobHuntApp.setWeeklyGoal) {
+        window.JobHuntApp.setWeeklyGoal(settings.weeklyGoal);
       }
 
     } catch (error) {
-      console.error('Failed to load user data:', error);
+      console.error('❌ Failed to load user data:', error);
     }
   }
 
@@ -276,12 +289,15 @@
     isSignedIn: () => !!currentUser
   };
 
-  // Auto-initialize when Firebase is ready
+  // Auto-initialize when DOM is ready
+  console.log('🔐 Auth: Waiting for DOM...');
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-      setTimeout(initAuth, 500); // Small delay to ensure Firebase loads
+      console.log('🔐 Auth: DOM ready, starting auth init...');
+      setTimeout(initAuth, 100);
     });
   } else {
-    setTimeout(initAuth, 500);
+    console.log('🔐 Auth: DOM already loaded, starting auth init...');
+    setTimeout(initAuth, 100);
   }
 })();
