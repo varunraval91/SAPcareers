@@ -5,6 +5,8 @@
  */
 
 (() => {
+  // Personal mode: no Google popup/login screen, auto-sign in anonymously.
+  const PERSONAL_ANON_MODE = true;
   let currentUser = null;
   let unsubscribeListener = null;
   let initRetries = 0;
@@ -61,12 +63,33 @@
         currentUser = user;
         onUserSignedIn(user);
       } else {
-        // User signed out
-        console.log('👤 User signed out');
+        // No user yet: in personal mode, sign in automatically without popup.
+        console.log('👤 No active user session');
         currentUser = null;
-        onUserSignedOut();
+        if (PERSONAL_ANON_MODE) {
+          startAnonymousSession();
+        } else {
+          onUserSignedOut();
+        }
       }
     });
+  }
+
+  async function startAnonymousSession() {
+    try {
+      console.log('🔐 Starting anonymous session...');
+      await FirebaseAPI.auth.signInAnonymously();
+    } catch (error) {
+      console.error('❌ Anonymous session failed:', error);
+      showAuthScreen();
+
+      let details = 'Enable Anonymous provider in Firebase Console > Authentication > Sign-in method.';
+      if (error.code === 'auth/admin-restricted-operation') {
+        details = 'Anonymous auth is disabled. Enable it in Firebase Console > Authentication > Sign-in method > Anonymous.';
+      }
+
+      showAuthError('Cannot start personal workspace session', details);
+    }
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -111,6 +134,14 @@
   // AUTH SCREEN UI
   // ═══════════════════════════════════════════════════════════
   function showAuthScreen() {
+    if (PERSONAL_ANON_MODE) {
+      // In personal mode, auth screen is only used for hard errors.
+      const appLayout = document.querySelector('.app-layout');
+      if (appLayout) {
+        appLayout.style.display = 'none';
+      }
+    }
+
     const existing = document.getElementById('auth-screen');
     if (existing) {
       existing.style.display = 'flex';
@@ -131,10 +162,10 @@
           <div class="auth-features">
             <div class="feature"><span class="feature-icon">📊</span>Track applications</div>
             <div class="feature"><span class="feature-icon">☁️</span>Cloud sync across devices</div>
-            <div class="feature"><span class="feature-icon">🔒</span>Google-secured login</div>
+            <div class="feature"><span class="feature-icon">🔒</span>${PERSONAL_ANON_MODE ? 'Private anonymous session' : 'Google-secured login'}</div>
           </div>
 
-          <button id="google-signin-btn" class="btn btn-primary btn-auth">
+          <button id="google-signin-btn" class="btn btn-primary btn-auth" ${PERSONAL_ANON_MODE ? 'style="display:none;"' : ''}>
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
               <path d="M9.003 18c2.43 0 4.467-.806 5.956-2.18L12.05 13.56c-.806.54-1.836.86-3.047.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9.003 18z" fill="#34A853"/>
@@ -155,7 +186,10 @@
     document.body.appendChild(authScreen);
 
     // Add click handler
-    document.getElementById('google-signin-btn').addEventListener('click', handleGoogleSignIn);
+    const googleBtn = document.getElementById('google-signin-btn');
+    if (googleBtn && !PERSONAL_ANON_MODE) {
+      googleBtn.addEventListener('click', handleGoogleSignIn);
+    }
   }
 
   function hideAuthScreen() {
@@ -197,15 +231,16 @@
         ${user.photoURL ? `<img src="${user.photoURL}" alt="${user.displayName}" />` : user.displayName?.charAt(0) || 'U'}
       </div>
       <div class="user-details">
-        <div class="user-name">${user.displayName || 'User'}</div>
-        <div class="user-email">${user.email}</div>
+        <div class="user-name">${user.displayName || (user.isAnonymous ? 'Private Workspace' : 'User')}</div>
+        <div class="user-email">${user.email || (user.isAnonymous ? 'Anonymous session' : '')}</div>
       </div>
-      <button id="signout-btn" class="btn-icon" title="Sign out">
-        ↪
-      </button>
+      ${PERSONAL_ANON_MODE ? '' : `<button id="signout-btn" class="btn-icon" title="Sign out">↪</button>`}
     `;
 
-    document.getElementById('signout-btn').addEventListener('click', handleSignOut);
+    const signoutBtn = document.getElementById('signout-btn');
+    if (signoutBtn && !PERSONAL_ANON_MODE) {
+      signoutBtn.addEventListener('click', handleSignOut);
+    }
   }
 
   // ═══════════════════════════════════════════════════════════

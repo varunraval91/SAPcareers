@@ -78,6 +78,18 @@ function signInWithGoogle() {
     });
 }
 
+function signInAnonymously() {
+  return auth.signInAnonymously()
+    .then((result) => {
+      console.log('✅ Signed in anonymously:', result.user.uid);
+      return result.user;
+    })
+    .catch((error) => {
+      console.error('Anonymous sign-in error:', error);
+      throw error;
+    });
+}
+
 function signOut() {
   return auth.signOut()
     .then(() => {
@@ -217,6 +229,7 @@ window.FirebaseAPI = {
   isReady: () => !!auth && !!db,
   auth: {
     signInWithGoogle,
+    signInAnonymously,
     signOut,
     getCurrentUser,
     onAuthStateChanged
