@@ -5,6 +5,15 @@
 
   const STAGES = ["Wishlist", "Applied", "OA/Test", "Interview", "Rejected", "Offer"];
 
+    // Firebase state
+    let currentUserId = null;
+    let useFirebase = false;
+
+    // Check if Firebase is available
+    function checkFirebase() {
+      return typeof FirebaseAPI !== 'undefined' && typeof AuthManager !== 'undefined';
+    }
+
   function safeStorageGet(key) {
     try {
       return localStorage.getItem(key);
@@ -66,10 +75,36 @@
   init();
 
   function init() {
+      // Check if Firebase is ready
+      useFirebase = checkFirebase();
+    
+      if (useFirebase) {
+        console.log('✅ Firebase mode enabled');
+        // App layout starts hidden, shown after auth
+        const appLayout = document.querySelector('.app-layout');
+        if (appLayout) {
+          appLayout.style.display = 'none';
+        }
+        // Auth will call loadUserDataAndRender when ready
+        return;
+      }
+    
+      console.log('⚠️ Offline mode (localStorage fallback)');
     setupTheme();
     bindEvents();
     renderUI();
   }
+
+    // Called by auth.js after user signs in
+    function loadUserDataAndRender(userId, applications) {
+      currentUserId = userId;
+      if (applications) {
+        state.applications = applications;
+      }
+      setupTheme();
+      bindEvents();
+      renderUI();
+    }
 
   function bindEvents() {
     addListener(DOM.themeToggle, "click", toggleTheme);
@@ -162,7 +197,18 @@
 
   function toggleTheme() {
     state.theme = state.theme === "dark" ? "light" : "dark";
-    safeStorageSet(THEME_KEY, state.theme);
+    
+      if (useFirebase && currentUserId) {
+        FirebaseAPI.db.saveSettings(currentUserId, {
+          theme: state.theme,
+          weeklyGoal: state.currentWeeklyGoal
+        }).catch((error) => {
+          console.error('Settings save error:', error);
+        });
+      } else {
+        safeStorageSet(THEME_KEY, state.theme);
+      }
+    
     setupTheme();
     showToast(`Switched to ${state.theme} mode`);
   }
@@ -188,19 +234,38 @@
         <button type="button" class="modal-close" id="modal-close-btn" aria-label="Close">✕</button>
       </div>
 
-      <form id="app-form" style="display:grid;gap:1rem;">
+      ${isEdit ? "" : `
+      <section id="source-step" style="display:grid;gap:0.9rem;margin-bottom:1rem;">
+        <div style="font-weight:600;">Step 1: Choose Input Source</div>
+        <div style="display:flex;gap:0.6rem;flex-wrap:wrap;">
+          <button type="button" class="btn btn-secondary" id="source-link-btn" data-source="link">Use Job Link</button>
+          <button type="button" class="btn btn-secondary" id="source-file-btn" data-source="file">Use File</button>
+        </div>
+
+        <div id="source-link-panel" style="display:none;">
+          <label for="source-link-input">Job Link</label>
+          <input type="url" id="source-link-input" placeholder="https://company.com/job/..." />
+        </div>
+
+        <div id="source-file-panel" style="display:none;">
+          <label for="source-file-input">Attachment (.txt, .csv, .xlsx)</label>
+          <input type="file" id="source-file-input" accept=".txt,.csv,.xlsx,.xls" />
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;">
+          <button type="button" class="btn btn-primary" id="extract-continue-btn">Extract and Continue</button>
+        </div>
+        <small class="text-muted">Step 2 form will open after extraction. If extraction is partial, you can manually edit before saving.</small>
+      </section>
+      `}
+
+      <form id="app-form" style="display:grid;gap:1rem;${isEdit ? "" : "display:none;"}">
         <input type="hidden" id="form-id" value="${app.id}" />
 
         <div class="form-group">
           <label for="form-link">Job Link</label>
           <input type="url" id="form-link" placeholder="https://company.com/job/..." value="${escapeAttr(app.link)}" />
           <small class="text-muted">Company, role, and posting date are auto-filled from the link.</small>
-        </div>
-
-        <div class="form-group">
-          <label for="form-attachment">Open Attachment (.txt, .csv, .xlsx)</label>
-          <input type="file" id="form-attachment" accept=".txt,.csv,.xlsx,.xls" />
-          <small class="text-muted">If file has job data, fields are extracted and auto-filled.</small>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
@@ -277,14 +342,99 @@
     document.getElementById("app-form").addEventListener("submit", saveApplicationFromForm);
 
     const linkInput = document.getElementById("form-link");
-    linkInput.addEventListener("input", () => applyLinkAutoFill(linkInput.value, true));
-    linkInput.addEventListener("blur", () => applyLinkAutoFill(linkInput.value, true));
 
-    const attachmentInput = document.getElementById("form-attachment");
-    attachmentInput.addEventListener("change", onFormAttachmentChange);
+    if (isEdit) {
+      linkInput.addEventListener("input", () => applyLinkAutoFill(linkInput.value, false));
+      linkInput.addEventListener("blur", () => applyLinkAutoFill(linkInput.value, false));
+      applyLinkAutoFill(linkInput.value, false);
+      return;
+    }
 
-    // Run once on open in case link already exists.
-    applyLinkAutoFill(linkInput.value, true);
+    setupSourceStepForNewApplication();
+  }
+
+  function setupSourceStepForNewApplication() {
+    const form = document.getElementById("app-form");
+    const sourceStep = document.getElementById("source-step");
+    const linkBtn = document.getElementById("source-link-btn");
+    const fileBtn = document.getElementById("source-file-btn");
+    const linkPanel = document.getElementById("source-link-panel");
+    const filePanel = document.getElementById("source-file-panel");
+    const extractBtn = document.getElementById("extract-continue-btn");
+    const sourceLinkInput = document.getElementById("source-link-input");
+    const sourceFileInput = document.getElementById("source-file-input");
+
+    let sourceMode = "";
+
+    function setSourceMode(mode) {
+      sourceMode = mode;
+      const isLink = mode === "link";
+      linkPanel.style.display = isLink ? "block" : "none";
+      filePanel.style.display = !isLink ? "block" : "none";
+      linkBtn.classList.toggle("btn-primary", isLink);
+      linkBtn.classList.toggle("btn-secondary", !isLink);
+      fileBtn.classList.toggle("btn-primary", !isLink);
+      fileBtn.classList.toggle("btn-secondary", isLink);
+    }
+
+    linkBtn.addEventListener("click", () => setSourceMode("link"));
+    fileBtn.addEventListener("click", () => setSourceMode("file"));
+
+    extractBtn.addEventListener("click", async () => {
+      if (!sourceMode) {
+        showToast("Select Job Link or File first", "warning");
+        return;
+      }
+
+      let extracted = null;
+      try {
+        if (sourceMode === "link") {
+          const linkValue = (sourceLinkInput.value || "").trim();
+          if (!linkValue) {
+            showToast("Please provide a job link", "warning");
+            return;
+          }
+
+          const inferred = inferFromJobLink(linkValue);
+          extracted = {
+            link: linkValue,
+            company: inferred ? inferred.company : "",
+            role: inferred ? inferred.role : "",
+            postingDate: inferred ? inferred.postingDate : "",
+            stage: "Applied"
+          };
+        } else {
+          const [file] = sourceFileInput.files || [];
+          if (!file) {
+            showToast("Please choose a file", "warning");
+            return;
+          }
+          extracted = await parseFormAttachment(file);
+        }
+      } catch (error) {
+        showToast(error.message || "Failed to extract data", "error");
+        return;
+      }
+
+      form.style.display = "grid";
+      sourceStep.style.display = "none";
+
+      if (extracted) {
+        applyFormData(extracted, true);
+      }
+
+      const linkInput = document.getElementById("form-link");
+      linkInput.addEventListener("input", () => applyLinkAutoFill(linkInput.value, false));
+      linkInput.addEventListener("blur", () => applyLinkAutoFill(linkInput.value, false));
+
+      const companyVal = getValue("form-company").trim();
+      const roleVal = getValue("form-role").trim();
+      if (companyVal || roleVal) {
+        showToast("Data extracted. Verify and submit.");
+      } else {
+        showToast("Could not extract enough data. Please fill manually.", "warning");
+      }
+    });
   }
 
   function closeModal() {
@@ -310,28 +460,6 @@
     }
     if (postingEl && inferred.postingDate && (force || !postingEl.value)) {
       postingEl.value = inferred.postingDate;
-    }
-  }
-
-  async function onFormAttachmentChange(event) {
-    const [file] = event.target.files || [];
-    if (!file) {
-      return;
-    }
-
-    try {
-      const extracted = await parseFormAttachment(file);
-      if (!extracted) {
-        showToast("Could not extract data from attachment", "warning");
-        return;
-      }
-
-      applyFormData(extracted, true);
-      showToast("Attachment data extracted");
-    } catch (error) {
-      showToast(error.message || "Attachment read failed", "error");
-    } finally {
-      event.target.value = "";
     }
   }
 
@@ -454,15 +582,7 @@
       const company = hostParts.length >= 2 ? toTitleCase(hostParts[hostParts.length - 2].replace(/[-_]/g, " ")) : "";
 
       const segments = url.pathname.split("/").filter(Boolean).map((part) => decodeURIComponent(part));
-      const slug = segments[segments.length - 1] || "";
-      const cleanSlug = slug
-        .replace(/\.[a-zA-Z0-9]+$/, "")
-        .replace(/[0-9]{3,}/g, " ")
-        .replace(/[-_]+/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-
-      const role = toTitleCase(cleanSlug);
+      const role = inferRoleFromUrl(url, segments);
 
       const postingDate = extractDateFromString(`${url.pathname} ${url.search}`);
 
@@ -474,6 +594,53 @@
     } catch {
       return null;
     }
+  }
+
+  function inferRoleFromUrl(url, segments) {
+    const genericSegments = new Set([
+      "jobs", "job", "careers", "career", "apply", "position", "positions", "vacancies", "opening", "openings", "view"
+    ]);
+
+    const candidates = [];
+
+    for (let i = segments.length - 1; i >= 0; i -= 1) {
+      const segment = sanitizeRoleSegment(segments[i]);
+      if (!segment) {
+        continue;
+      }
+      if (genericSegments.has(segment.toLowerCase())) {
+        continue;
+      }
+      candidates.push(segment);
+    }
+
+    const queryKeys = ["title", "jobtitle", "role", "position", "job"];
+    queryKeys.forEach((key) => {
+      const val = url.searchParams.get(key);
+      const clean = sanitizeRoleSegment(val || "");
+      if (clean) {
+        candidates.push(clean);
+      }
+    });
+
+    const best = candidates
+      .sort((a, b) => b.length - a.length)
+      .find((item) => item.length >= 3);
+
+    return best ? toTitleCase(best) : "";
+  }
+
+  function sanitizeRoleSegment(value) {
+    if (!value) {
+      return "";
+    }
+    return String(value)
+      .replace(/\.[a-zA-Z0-9]+$/, "")
+      .replace(/[0-9]{3,}/g, " ")
+      .replace(/[+_\-]+/g, " ")
+      .replace(/[^a-zA-Z\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
   }
 
   function saveApplicationFromForm(event) {
@@ -528,16 +695,37 @@
       };
       showToast("Application updated");
     } else {
+        payload.createdAt = new Date().toISOString();
       state.applications.unshift({
-        ...payload,
-        createdAt: new Date().toISOString()
+          ...payload
       });
       showToast("Application added");
     }
 
-    saveApplications();
+      // Save to Firebase or localStorage
+      if (useFirebase && currentUserId) {
+        const appToSave = existingIndex >= 0 
+          ? state.applications[existingIndex]
+          : state.applications[0];
+      
+        FirebaseAPI.db.saveApplication(currentUserId, appToSave)
+          .then(() => {
+            console.log('✅ Saved to Firebase');
+          })
+          .catch((error) => {
+            console.error('Firebase save error:', error);
+            showToast('Failed to save to cloud. Check connection.', 'error');
+          });
+      } else {
+        saveApplications();
+      }
+    
     closeModal();
-    renderUI();
+    
+      // Only re-render if not using Firebase real-time updates
+      if (!useFirebase) {
+        renderUI();
+      }
   }
 
   function renderStats() {
@@ -683,8 +871,25 @@
     }
 
     state.applications = state.applications.filter((item) => item.id !== id);
-    saveApplications();
-    renderUI();
+    
+      if (useFirebase && currentUserId) {
+        FirebaseAPI.db.deleteApplication(currentUserId, id)
+          .then(() => {
+            console.log('✅ Deleted from Firebase');
+          })
+          .catch((error) => {
+            console.error('Firebase delete error:', error);
+            showToast('Failed to delete from cloud', 'error');
+          });
+      } else {
+        saveApplications();
+        renderUI();
+      }
+    
+      if (!useFirebase) {
+        renderUI();
+      }
+    
     showToast("Application deleted");
   }
 
@@ -919,7 +1124,18 @@
     }
 
     state.currentWeeklyGoal = parsed;
-    safeStorageSet(GOAL_KEY, String(parsed));
+    
+      if (useFirebase && currentUserId) {
+        FirebaseAPI.db.saveSettings(currentUserId, {
+          theme: state.theme,
+          weeklyGoal: state.currentWeeklyGoal
+        }).catch((error) => {
+          console.error('Settings save error:', error);
+        });
+      } else {
+        safeStorageSet(GOAL_KEY, String(parsed));
+      }
+    
     renderGoal();
     showToast("Weekly goal updated");
   }
@@ -1045,6 +1261,10 @@
   }
 
   function loadApplications() {
+      if (useFirebase) {
+        // Firebase loads data after auth
+        return [];
+      }
     try {
       const raw = safeStorageGet(STORAGE_KEY);
       if (!raw) {
@@ -1058,6 +1278,10 @@
   }
 
   function saveApplications() {
+      if (useFirebase && currentUserId) {
+        // Firebase saves handled per-application in saveApplicationFromForm
+        return;
+      }
     safeStorageSet(STORAGE_KEY, JSON.stringify(state.applications));
   }
 
@@ -1149,4 +1373,23 @@
     }
     return date.toLocaleDateString();
   }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PUBLIC API FOR AUTH INTEGRATION
+    // ═══════════════════════════════════════════════════════════════
+    window.JobHuntApp = {
+      setApplications: (applications) => {
+        state.applications = applications;
+        renderUI();
+      },
+      setTheme: (theme) => {
+        state.theme = theme;
+        setupTheme();
+      },
+      setWeeklyGoal: (goal) => {
+        state.currentWeeklyGoal = goal;
+        renderGoal();
+      },
+      init: loadUserDataAndRender
+    };
 })();
