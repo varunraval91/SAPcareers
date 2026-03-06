@@ -8,7 +8,7 @@
  * 2. Copy the firebaseConfig object Perplexity gives you
  * 3. Replace the placeholder config below with your real config
  * 4. Enable Firestore Database in Firebase Console
- * 5. Enable Google Authentication in Firebase Console
+ * 5. Enable Anonymous Authentication in Firebase Console
  * 6. Deploy and test
  */
 
@@ -29,7 +29,7 @@ const firebaseConfig = {
 // ═══════════════════════════════════════════════════════════════
 // INITIALIZE FIREBASE
 // ═══════════════════════════════════════════════════════════════
-let app, auth, db, googleProvider;
+let app, auth, db;
 
 function initializeFirebase() {
   try {
@@ -43,8 +43,6 @@ function initializeFirebase() {
     app = firebase.initializeApp(firebaseConfig);
     auth = firebase.auth();
     db = firebase.firestore();
-    googleProvider = new firebase.auth.GoogleAuthProvider();
-
     // Enable offline persistence
     db.enablePersistence({ synchronizeTabs: true })
       .catch((err) => {
@@ -60,24 +58,8 @@ function initializeFirebase() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// AUTHENTICATION HELPERS
+// AUTHENTICATION HELPERS (ANONYMOUS PERSONAL MODE)
 // ═══════════════════════════════════════════════════════════════
-function signInWithGoogle() {
-  return auth.signInWithPopup(googleProvider)
-    .then((result) => {
-      console.log('✅ Signed in:', result.user.email);
-      return result.user;
-    })
-    .catch((error) => {
-      if (error && error.code === 'auth/popup-blocked') {
-        console.warn('Popup blocked, using redirect flow...');
-        return auth.signInWithRedirect(googleProvider);
-      }
-      console.error('Sign-in error:', error);
-      throw error;
-    });
-}
-
 function signInAnonymously() {
   return auth.signInAnonymously()
     .then((result) => {
@@ -228,7 +210,6 @@ window.FirebaseAPI = {
   initialize: initializeFirebase,
   isReady: () => !!auth && !!db,
   auth: {
-    signInWithGoogle,
     signInAnonymously,
     signOut,
     getCurrentUser,

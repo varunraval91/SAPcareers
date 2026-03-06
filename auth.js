@@ -5,8 +5,6 @@
  */
 
 (() => {
-  // Personal mode: no Google popup/login screen, auto-sign in anonymously.
-  const PERSONAL_ANON_MODE = true;
   let currentUser = null;
   let unsubscribeListener = null;
   let initRetries = 0;
@@ -18,7 +16,7 @@
   function initAuth() {
     console.log('🔐 Auth: Checking Firebase...');
 
-    // Google auth popups do not work reliably from file:// origins.
+    // Firebase web app should run on localhost/http, not file://.
     if (window.location.protocol === 'file:') {
       showAuthScreen();
       showAuthError(
@@ -59,18 +57,14 @@
     FirebaseAPI.auth.onAuthStateChanged((user) => {
       if (user) {
         // User signed in
-        console.log('👤 User signed in:', user.email);
+        console.log('👤 User signed in:', user.email || user.uid);
         currentUser = user;
         onUserSignedIn(user);
       } else {
-        // No user yet: in personal mode, sign in automatically without popup.
+        // No user yet: sign in automatically without popup.
         console.log('👤 No active user session');
         currentUser = null;
-        if (PERSONAL_ANON_MODE) {
-          startAnonymousSession();
-        } else {
-          onUserSignedOut();
-        }
+        startAnonymousSession();
       }
     });
   }
@@ -140,12 +134,10 @@
   // AUTH SCREEN UI
   // ═══════════════════════════════════════════════════════════
   function showAuthScreen() {
-    if (PERSONAL_ANON_MODE) {
-      // In personal mode, auth screen is only used for hard errors.
-      const appLayout = document.querySelector('.app-layout');
-      if (appLayout) {
-        appLayout.style.display = 'none';
-      }
+    // Error-only screen in anonymous personal mode.
+    const appLayout = document.querySelector('.app-layout');
+    if (appLayout) {
+      appLayout.style.display = 'none';
     }
 
     const existing = document.getElementById('auth-screen');
@@ -168,20 +160,8 @@
           <div class="auth-features">
             <div class="feature"><span class="feature-icon">📊</span>Track applications</div>
             <div class="feature"><span class="feature-icon">☁️</span>Cloud sync across devices</div>
-            <div class="feature"><span class="feature-icon">🔒</span>${PERSONAL_ANON_MODE ? 'Private anonymous session' : 'Google-secured login'}</div>
+            <div class="feature"><span class="feature-icon">🔒</span>Private anonymous session</div>
           </div>
-
-          ${PERSONAL_ANON_MODE ? '' : `
-          <button id="google-signin-btn" class="btn btn-primary btn-auth">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
-              <path d="M9.003 18c2.43 0 4.467-.806 5.956-2.18L12.05 13.56c-.806.54-1.836.86-3.047.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9.003 18z" fill="#34A853"/>
-              <path d="M3.964 10.712c-.18-.54-.282-1.117-.282-1.71 0-.593.102-1.17.282-1.71V4.96H.957C.347 6.175 0 7.55 0 9.002c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
-              <path d="M9.003 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.464.891 11.428 0 9.003 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29c.708-2.127 2.692-3.71 5.036-3.71z" fill="#EA4335"/>
-            </svg>
-            Sign in with Google
-          </button>
-          `}
 
           <div id="auth-error" class="auth-error" style="display:none;"></div>
 
@@ -192,12 +172,6 @@
     `;
 
     document.body.appendChild(authScreen);
-
-    // Add click handler
-    const googleBtn = document.getElementById('google-signin-btn');
-    if (googleBtn && !PERSONAL_ANON_MODE) {
-      googleBtn.addEventListener('click', handleGoogleSignIn);
-    }
   }
 
   function hideAuthScreen() {
@@ -242,80 +216,13 @@
         <div class="user-name">${user.displayName || (user.isAnonymous ? 'Private Workspace' : 'User')}</div>
         <div class="user-email">${user.email || (user.isAnonymous ? 'Anonymous session' : '')}</div>
       </div>
-      ${PERSONAL_ANON_MODE ? '' : `<button id="signout-btn" class="btn-icon" title="Sign out">↪</button>`}
     `;
-
-    const signoutBtn = document.getElementById('signout-btn');
-    if (signoutBtn && !PERSONAL_ANON_MODE) {
-      signoutBtn.addEventListener('click', handleSignOut);
-    }
   }
 
   // ═══════════════════════════════════════════════════════════
   // AUTH HANDLERS
   // ═══════════════════════════════════════════════════════════
-  async function handleGoogleSignIn() {
-    const btn = document.getElementById('google-signin-btn');
-    const originalText = btn.innerHTML;
-    
-    try {
-      btn.disabled = true;
-      btn.innerHTML = '<span style="display: inline-block; animation: spin 1s linear infinite;">⟳</span> Signing in...';
-      hideAuthError();
-
-      console.log('🔐 Initiating Google Sign-In...');
-      await FirebaseAPI.auth.signInWithGoogle();
-      console.log('✅ Sign-In successful!');
-      
-      // Success - onAuthStateChanged will handle UI
-    } catch (error) {
-      console.error('❌ Sign-in error:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
-      
-      let message = error.message || 'Sign-in failed. Please try again.';
-      let details = '';
-      
-      if (error.code === 'auth/popup-blocked') {
-        message = 'Popup was blocked by your browser';
-        details = 'Please allow popups for this site and try again.';
-      } else if (error.code === 'auth/popup-closed-by-user') {
-        message = 'Sign-in cancelled';
-        details = 'You closed the sign-in window. Please try again.';
-      } else if (error.code === 'auth/network-request-failed') {
-        message = 'Network error';
-        details = 'Check your internet connection and try again.';
-      } else if (error.code === 'auth/operation-not-allowed') {
-        message = 'Sign-in not configured';
-        details = 'Google Sign-In is not enabled. Please check Firebase Console.';
-      } else if (error.code === 'auth/unauthorized-domain') {
-        message = 'Domain not authorized';
-        details = `Add this domain in Firebase Auth > Settings > Authorized domains: ${window.location.hostname}`;
-      } else if (error.code === 'auth/invalid-api-key') {
-        message = 'Invalid Firebase API key';
-        details = 'Your firebase config is wrong for this project. Re-copy config from Firebase Console > Project Settings > General.';
-      } else if (error.code === 'auth/operation-not-supported-in-this-environment') {
-        message = 'Unsupported environment for popup sign-in';
-        details = 'Open this app via localhost/http instead of file:// and try again.';
-      }
-      
-      showAuthError(message, details);
-      btn.disabled = false;
-      btn.innerHTML = originalText;
-    }
-  }
-
-  async function handleSignOut() {
-    if (!confirm('Sign out?')) return;
-
-    try {
-      await FirebaseAPI.auth.signOut();
-      // onAuthStateChanged will handle UI
-    } catch (error) {
-      console.error('Sign-out error:', error);
-      alert('Sign-out failed. Please try again.');
-    }
-  }
+  // No explicit login/logout handlers needed in anonymous personal mode.
 
   function showAuthError(message, details = '') {
     const errorEl = document.getElementById('auth-error');
