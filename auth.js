@@ -86,6 +86,12 @@
       let details = 'Enable Anonymous provider in Firebase Console > Authentication > Sign-in method.';
       if (error.code === 'auth/admin-restricted-operation') {
         details = 'Anonymous auth is disabled. Enable it in Firebase Console > Authentication > Sign-in method > Anonymous.';
+      } else if (error.code === 'auth/operation-not-allowed') {
+        details = 'Anonymous auth is disabled. Enable it in Firebase Console > Authentication > Sign-in method > Anonymous.';
+      } else if (error.code === 'auth/unauthorized-domain') {
+        details = `Add this domain in Firebase Auth > Settings > Authorized domains: ${window.location.hostname}`;
+      } else if (error.code === 'auth/invalid-api-key') {
+        details = 'Invalid Firebase API key. Re-copy firebaseConfig from Firebase Console > Project settings.';
       }
 
       showAuthError('Cannot start personal workspace session', details);
@@ -96,7 +102,7 @@
   // UI STATE MANAGEMENT
   // ═══════════════════════════════════════════════════════════
   function onUserSignedIn(user) {
-    console.log('User signed in:', user.email);
+    console.log('User signed in:', user.email || user.uid);
     
     // Hide auth screen
     hideAuthScreen();
@@ -106,7 +112,7 @@
     
     // Update user info in UI
     updateUserInfo(user);
-    
+
     // Load user data from Firestore
     loadUserData(user.uid);
     
@@ -157,7 +163,7 @@
             <span class="auth-logo-icon">JH</span>
           </div>
           <h1 class="auth-title">Job Hunt HQ</h1>
-          <p class="auth-subtitle">Track applications and sync everything in Firebase</p>
+          <p class="auth-subtitle">${PERSONAL_ANON_MODE ? 'Starting your private cloud workspace...' : 'Track applications and sync everything in Firebase'}</p>
 
           <div class="auth-features">
             <div class="feature"><span class="feature-icon">📊</span>Track applications</div>
@@ -165,7 +171,8 @@
             <div class="feature"><span class="feature-icon">🔒</span>${PERSONAL_ANON_MODE ? 'Private anonymous session' : 'Google-secured login'}</div>
           </div>
 
-          <button id="google-signin-btn" class="btn btn-primary btn-auth" ${PERSONAL_ANON_MODE ? 'style="display:none;"' : ''}>
+          ${PERSONAL_ANON_MODE ? '' : `
+          <button id="google-signin-btn" class="btn btn-primary btn-auth">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
               <path d="M9.003 18c2.43 0 4.467-.806 5.956-2.18L12.05 13.56c-.806.54-1.836.86-3.047.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9.003 18z" fill="#34A853"/>
@@ -174,6 +181,7 @@
             </svg>
             Sign in with Google
           </button>
+          `}
 
           <div id="auth-error" class="auth-error" style="display:none;"></div>
 
