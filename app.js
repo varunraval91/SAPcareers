@@ -194,17 +194,23 @@
         <div class="form-group">
           <label for="form-link">Job Link</label>
           <input type="url" id="form-link" placeholder="https://company.com/job/..." value="${escapeAttr(app.link)}" />
-          <small class="text-muted">Autofills company, role, and posting date from link pattern.</small>
+          <small class="text-muted">Company, role, and posting date are auto-filled from the link.</small>
+        </div>
+
+        <div class="form-group">
+          <label for="form-attachment">Open Attachment (.txt, .csv, .xlsx)</label>
+          <input type="file" id="form-attachment" accept=".txt,.csv,.xlsx,.xls" />
+          <small class="text-muted">If file has job data, fields are extracted and auto-filled.</small>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
           <div class="form-group">
-            <label for="form-company">Company Name *</label>
-            <input type="text" id="form-company" maxlength="120" required value="${escapeAttr(app.company)}" />
+            <label for="form-company">Company Name</label>
+            <input type="text" id="form-company" maxlength="120" value="${escapeAttr(app.company)}" />
           </div>
           <div class="form-group">
-            <label for="form-role">Job Title *</label>
-            <input type="text" id="form-role" maxlength="200" required value="${escapeAttr(app.role)}" />
+            <label for="form-role">Job Title</label>
+            <input type="text" id="form-role" maxlength="200" value="${escapeAttr(app.role)}" />
           </div>
         </div>
 
@@ -271,7 +277,14 @@
     document.getElementById("app-form").addEventListener("submit", saveApplicationFromForm);
 
     const linkInput = document.getElementById("form-link");
-    linkInput.addEventListener("blur", () => applyLinkAutoFill(linkInput.value));
+    linkInput.addEventListener("input", () => applyLinkAutoFill(linkInput.value, true));
+    linkInput.addEventListener("blur", () => applyLinkAutoFill(linkInput.value, true));
+
+    const attachmentInput = document.getElementById("form-attachment");
+    attachmentInput.addEventListener("change", onFormAttachmentChange);
+
+    // Run once on open in case link already exists.
+    applyLinkAutoFill(linkInput.value, true);
   }
 
   function closeModal() {
@@ -279,7 +292,7 @@
     DOM.modalBackdrop.classList.add("hidden");
   }
 
-  function applyLinkAutoFill(rawLink) {
+  function applyLinkAutoFill(rawLink, force = false) {
     const inferred = inferFromJobLink(rawLink);
     if (!inferred) {
       return;
@@ -289,15 +302,145 @@
     const roleEl = document.getElementById("form-role");
     const postingEl = document.getElementById("form-posting-date");
 
-    if (companyEl && !companyEl.value.trim() && inferred.company) {
+    if (companyEl && inferred.company && (force || !companyEl.value.trim())) {
       companyEl.value = inferred.company;
     }
-    if (roleEl && !roleEl.value.trim() && inferred.role) {
+    if (roleEl && inferred.role && (force || !roleEl.value.trim())) {
       roleEl.value = inferred.role;
     }
-    if (postingEl && !postingEl.value && inferred.postingDate) {
+    if (postingEl && inferred.postingDate && (force || !postingEl.value)) {
       postingEl.value = inferred.postingDate;
     }
+  }
+
+  async function onFormAttachmentChange(event) {
+    const [file] = event.target.files || [];
+    if (!file) {
+      return;
+    }
+
+    try {
+      const extracted = await parseFormAttachment(file);
+      if (!extracted) {
+        showToast("Could not extract data from attachment", "warning");
+        return;
+      }
+
+      applyFormData(extracted, true);
+      showToast("Attachment data extracted");
+    } catch (error) {
+      showToast(error.message || "Attachment read failed", "error");
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  async function parseFormAttachment(file) {
+    const lowerName = file.name.toLowerCase();
+
+    if (lowerName.endsWith(".txt")) {
+      const text = await file.text();
+      return parseTextAttachment(text);
+    }
+
+    if (lowerName.endsWith(".csv")) {
+      const text = await file.text();
+      const rows = parseCSVText(text);
+      if (!rows.length) {
+        return null;
+      }
+      return normalizeImportedEntry(rows[0]);
+    }
+
+    if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
+      if (typeof window.XLSX === "undefined") {
+        throw new Error("Excel parser not available. Please retry with internet connection or use CSV/TXT.");
+      }
+      const buffer = await file.arrayBuffer();
+      const workbook = window.XLSX.read(buffer, { type: "array" });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = window.XLSX.utils.sheet_to_json(firstSheet, {
+        defval: "",
+        raw: false,
+        dateNF: "yyyy-mm-dd"
+      });
+      if (!rows.length) {
+        return null;
+      }
+      return normalizeImportedEntry(rows[0]);
+    }
+
+    throw new Error("Unsupported attachment type. Use TXT, CSV, or Excel.");
+  }
+
+  function parseTextAttachment(text) {
+    if (!text || !text.trim()) {
+      return null;
+    }
+
+    const map = {};
+    text.split(/\r?\n/).forEach((line) => {
+      const [rawKey, ...rest] = line.split(":");
+      if (!rawKey || rest.length === 0) {
+        return;
+      }
+      const key = normalizeKey(rawKey);
+      const value = rest.join(":").trim();
+      if (key && value) {
+        map[key] = value;
+      }
+    });
+
+    const possibleUrl = text.match(/https?:\/\/[^\s]+/i);
+    const link = (map.joblink || map.link || map.url || (possibleUrl ? possibleUrl[0] : "")).trim();
+    const inferred = inferFromJobLink(link);
+
+    return {
+      link,
+      company: map.company || map.companyname || (inferred ? inferred.company : ""),
+      role: map.jobtitle || map.title || map.role || (inferred ? inferred.role : ""),
+      postingDate: toIsoDate(map.jobpostingdate || map.postingdate || map.posteddate || (inferred ? inferred.postingDate : "")),
+      stage: map.stage || "Applied",
+      appliedDate: toIsoDate(map.applieddate || map.dateapplied || ""),
+      deadline: toIsoDate(map.selfdeadline || map.deadline || ""),
+      followupDate: toIsoDate(map.followupdate || map.followup || ""),
+      contactType: map.contacttype || map.contactpersontype || "",
+      contactName: map.contactname || map.contactperson || map.contact || "",
+      notes: map.notes || map.remark || map.comments || ""
+    };
+  }
+
+  function applyFormData(data, force = false) {
+    if (!data) {
+      return;
+    }
+
+    setFormValue("form-link", data.link, force);
+    setFormValue("form-company", data.company, force);
+    setFormValue("form-role", data.role, force);
+    setFormValue("form-posting-date", data.postingDate, force);
+    setFormValue("form-stage", data.stage, force);
+    setFormValue("form-applied-date", data.appliedDate, force);
+    setFormValue("form-deadline", data.deadline, force);
+    setFormValue("form-followup", data.followupDate, force);
+    setFormValue("form-contact-type", data.contactType, force);
+    setFormValue("form-contact-name", data.contactName, force);
+    setFormValue("form-notes", data.notes, force);
+
+    if (data.link) {
+      applyLinkAutoFill(data.link, force);
+    }
+  }
+
+  function setFormValue(id, value, force = false) {
+    const el = document.getElementById(id);
+    if (!el || value === undefined || value === null || value === "") {
+      return;
+    }
+    if (!force && String(el.value || "").trim()) {
+      return;
+    }
+    el.value = value;
   }
 
   function inferFromJobLink(rawLink) {
@@ -337,10 +480,10 @@
     event.preventDefault();
 
     const id = getValue("form-id");
-    const company = getValue("form-company").trim();
-    const role = getValue("form-role").trim();
+    const typedCompany = getValue("form-company").trim();
+    const typedRole = getValue("form-role").trim();
     const link = getValue("form-link").trim();
-    const postingDate = getValue("form-posting-date");
+    const typedPostingDate = getValue("form-posting-date");
     const stage = getValue("form-stage") || "Applied";
     const appliedDate = getValue("form-applied-date");
     const deadline = getValue("form-deadline");
@@ -349,8 +492,13 @@
     const contactName = getValue("form-contact-name").trim();
     const notes = getValue("form-notes").trim();
 
+    const inferred = inferFromJobLink(link);
+    const company = typedCompany || (inferred ? inferred.company : "") || (link ? "Unknown Company" : "");
+    const role = typedRole || (inferred ? inferred.role : "") || (link ? "Unknown Role" : "");
+    const postingDate = typedPostingDate || (inferred ? inferred.postingDate : "") || "";
+
     if (!company || !role) {
-      showToast("Company and Job Title are required", "error");
+      showToast("Please provide a Job Link or upload an attachment", "error");
       return;
     }
 
