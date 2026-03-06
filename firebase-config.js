@@ -13,15 +13,17 @@
  */
 
 // ═══════════════════════════════════════════════════════════════
-// PASTE YOUR FIREBASE CONFIG HERE (from Perplexity/Firebase Console)
+// Firebase Configuration (from Firebase Console)
+// Project: jobs-progress-tracker
 // ═══════════════════════════════════════════════════════════════
 const firebaseConfig = {
-  apiKey: "PASTE_YOUR_API_KEY_HERE",
-  authDomain: "PASTE_YOUR_AUTH_DOMAIN_HERE",
-  projectId: "PASTE_YOUR_PROJECT_ID_HERE",
-  storageBucket: "PASTE_YOUR_STORAGE_BUCKET_HERE",
-  messagingSenderId: "PASTE_YOUR_MESSAGING_SENDER_ID_HERE",
-  appId: "PASTE_YOUR_APP_ID_HERE"
+  apiKey: "AIzaSyDG0VBXMrUdxzpw3Hwwrsr_oRtiVg_vSuM",
+  authDomain: "jobs-progress-tracker.firebaseapp.com",
+  projectId: "jobs-progress-tracker",
+  storageBucket: "jobs-progress-tracker.firebasestorage.app",
+  messagingSenderId: "556518693770",
+  appId: "1:556518693770:web:2df595285bf3ec199f0673",
+  measurementId: "G-8JNFN5X2RE"
 };
 
 // ═══════════════════════════════════════════════════════════════
