@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Job Hunt HQ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- TOAST CONTAINER                         -->
+  <!-- ═══════════════════════════════════════ -->
+  <div id="toast-container" aria-live="polite"></div>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- MODAL BACKDROP                          -->
+  <!-- ═══════════════════════════════════════ -->
+  <div id="modal-backdrop" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-box" id="modal-box">
+      <!-- Injected by JS -->
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- MAIN LAYOUT                             -->
+  <!-- ═══════════════════════════════════════ -->
+  <div class="app-layout">
+
+    <!-- SIDEBAR (desktop only) -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <span class="logo-mark">JH</span>
+        <span class="logo-text">Job Hunt HQ</span>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-view="dashboard">
+          <span class="nav-icon">▦</span> Dashboard
+        </a>
+        <a href="#" class="nav-item" data-view="analytics">
+          <span class="nav-icon">◎</span> Analytics
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="theme-toggle" aria-label="Toggle theme">
+          <span id="theme-icon">☀</span>
+        </button>
+        <button id="import-data-btn" title="Import applications from CSV/Excel">
+          ↑ Import CSV/Excel
+        </button>
+        <input id="import-file-input" type="file" accept=".csv,.xlsx,.xls" class="hidden" />
+        <button id="export-csv-btn" title="Export all data as CSV">
+          ↓ Export CSV
+        </button>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content" id="main-content">
+
+      <!-- ─── TOP BAR ─── -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1 class="app-title">Your Job Hunt HQ</h1>
+          <p class="app-subtitle">Track every move. Stay relentless.</p>
+        </div>
+        <div class="topbar-right">
+          <button type="button" class="btn btn-primary btn-add" id="open-modal-btn" aria-label="Add new application" onclick="if(window.JobHuntHQOpenModal){window.JobHuntHQOpenModal();}">
+            <span>+</span> New Application
+          </button>
+        </div>
+      </header>
+
+      <!-- ─── MOTIVATIONAL QUOTE BLOCK ─── -->
+      <section class="quote-section" id="quote-section" aria-label="Daily motivation">
+        <div class="quote-card" id="quote-card">
+          <span class="quote-decoration">"</span>
+          <p class="quote-text" id="quote-text"></p>
+          <div class="quote-footer">
+            <span class="quote-tag" id="quote-tag"></span>
+            <button class="quote-shuffle-btn" id="quote-shuffle-btn" aria-label="Shuffle quote" title="New quote">↻</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── WEEKLY GOAL WIDGET ─── -->
+      <section class="goal-section" id="goal-section">
+        <div class="goal-widget">
+          <div class="goal-label">
+            <span>Weekly Goal</span>
+            <button class="goal-edit-btn" id="goal-edit-btn" aria-label="Edit weekly goal">✎</button>
+          </div>
+          <div class="goal-bar-track">
+            <div class="goal-bar-fill" id="goal-bar-fill"></div>
+          </div>
+          <div class="goal-text" id="goal-text">0 / 10 applications this week</div>
+        </div>
+      </section>
+
+      <!-- ─── STATS BAR ─── -->
+      <section class="stats-bar" id="stats-bar" aria-label="Application statistics">
+        <div class="stat-tile" data-filter="all" tabindex="0" role="button" aria-label="Total applications">
+          <div class="stat-icon">📋</div>
+          <div class="stat-value" id="stat-total">0</div>
+          <div class="stat-label">Total</div>
+          <div class="stat-accent" style="background: var(--accent-primary)"></div>
+        </div>
+        <div class="stat-tile" data-filter="Applied" tabindex="0" role="button" aria-label="Applied">
+          <div class="stat-icon">📤</div>
+          <div class="stat-value" id="stat-applied">0</div>
+          <div class="stat-label">Applied</div>
+          <div class="stat-accent" style="background: var(--accent-info)"></div>
+        </div>
+        <div class="stat-tile" data-filter="Interview" tabindex="0" role="button" aria-label="Interviews">
+          <div class="stat-icon">🎯</div>
+          <div class="stat-value" id="stat-interview">0</div>
+          <div class="stat-label">Interview</div>
+          <div class="stat-accent" style="background: var(--accent-warning)"></div>
+        </div>
+        <div class="stat-tile" data-filter="Offer" tabindex="0" role="button" aria-label="Offers">
+          <div class="stat-icon">🏆</div>
+          <div class="stat-value" id="stat-offers">0</div>
+          <div class="stat-label">Offers</div>
+          <div class="stat-accent" style="background: var(--accent-success)"></div>
+        </div>
+        <div class="stat-tile" data-filter="followup" tabindex="0" role="button" aria-label="Follow-ups due">
+          <div class="stat-icon">⏰</div>
+          <div class="stat-value" id="stat-followup">0</div>
+          <div class="stat-label">Follow-up Due</div>
+          <div class="stat-accent" style="background: var(--accent-secondary)"></div>
+        </div>
+        <div class="stat-tile" data-filter="responserate" tabindex="0" role="button" aria-label="Response rate">
+          <div class="stat-icon">📊</div>
+          <div class="stat-value" id="stat-response">0%</div>
+          <div class="stat-label">Response Rate</div>
+          <div class="stat-accent" style="background: var(--accent-primary)"></div>
+        </div>
+      </section>
+
+      <!-- Stage Distribution Bar -->
+      <div class="stage-distribution" id="stage-distribution" aria-label="Stage distribution">
+        <!-- Injected by JS as colored proportional segments -->
+      </div>
+
+      <!-- ─── SEARCH + FILTER TOOLBAR ─── -->
+      <div class="toolbar" role="search">
+        <div class="search-wrapper">
+          <span class="search-icon" aria-hidden="true">🔍</span>
+          <input
+            type="text"
+            id="search-input"
+            class="search-input"
+            placeholder="Search company, role, contact..."
+            aria-label="Search applications"
+            autocomplete="off"
+          />
+        </div>
+        <div class="filter-chips" id="filter-chips" role="group" aria-label="Filter by stage">
+          <button class="chip chip-active" data-stage="all">All</button>
+          <button class="chip" data-stage="Wishlist">Wishlist</button>
+          <button class="chip" data-stage="Applied">Applied</button>
+          <button class="chip" data-stage="OA/Test">OA/Test</button>
+          <button class="chip" data-stage="Interview">Interview</button>
+          <button class="chip" data-stage="Rejected">Rejected</button>
+          <button class="chip" data-stage="Offer">Offer</button>
+        </div>
+        <div class="sort-wrapper">
+          <select id="sort-select" class="sort-select" aria-label="Sort applications">
+            <option value="deadline-asc">Deadline ↑ Nearest</option>
+            <option value="deadline-desc">Deadline ↓ Furthest</option>
+            <option value="date-desc">Added: Newest</option>
+            <option value="date-asc">Added: Oldest</option>
+            <option value="company-asc">Company A–Z</option>
+            <option value="fit-desc">Fit Rating ↓</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Active filter indicator -->
+      <div class="active-filter-bar" id="active-filter-bar" hidden>
+        Filtering: <span id="active-filter-label"></span>
+        <button id="clear-filter-btn" aria-label="Clear filter">✕ Clear</button>
+      </div>
+
+      <!-- ─── KANBAN BOARD ─── -->
+      <div class="kanban-board" id="kanban-board" role="region" aria-label="Application pipeline board">
+        <!-- 6 columns injected by JS -->
+      </div>
+
+    </main>
+  </div>
+
+  <script src="quotes.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
