@@ -155,7 +155,7 @@
             <span class="auth-logo-icon">JH</span>
           </div>
           <h1 class="auth-title">Job Hunt HQ</h1>
-          <p class="auth-subtitle">${PERSONAL_ANON_MODE ? 'Starting your private cloud workspace...' : 'Track applications and sync everything in Firebase'}</p>
+          <p class="auth-subtitle">Starting your private cloud workspace...</p>
 
           <div class="auth-features">
             <div class="feature"><span class="feature-icon">📊</span>Track applications</div>
