@@ -185,23 +185,40 @@
     
     try {
       btn.disabled = true;
-      btn.innerHTML = 'Signing in...';
+      btn.innerHTML = '<span style="display: inline-block; animation: spin 1s linear infinite;">⟳</span> Signing in...';
       hideAuthError();
 
+      console.log('🔐 Initiating Google Sign-In...');
       await FirebaseAPI.auth.signInWithGoogle();
+      console.log('✅ Sign-In successful!');
       
       // Success - onAuthStateChanged will handle UI
     } catch (error) {
-      console.error('Sign-in error:', error);
+      console.error('❌ Sign-in error:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
       
-      let message = 'Sign-in failed. Please try again.';
+      let message = error.message || 'Sign-in failed. Please try again.';
+      let details = '';
+      
       if (error.code === 'auth/popup-blocked') {
-        message = 'Popup blocked. Please allow popups and try again.';
+        message = 'Popup was blocked by your browser';
+        details = 'Please allow popups for this site and try again.';
       } else if (error.code === 'auth/popup-closed-by-user') {
-        message = 'Sign-in cancelled.';
+        message = 'Sign-in cancelled';
+        details = 'You closed the sign-in window. Please try again.';
+      } else if (error.code === 'auth/network-request-failed') {
+        message = 'Network error';
+        details = 'Check your internet connection and try again.';
+      } else if (error.code === 'auth/operation-not-allowed') {
+        message = 'Sign-in not configured';
+        details = 'Google Sign-In is not enabled. Please check Firebase Console.';
+      } else if (error.code === 'auth/unauthorized-domain') {
+        message = 'Domain not authorized';
+        details = 'This domain is not authorized for Google Sign-In. Go to Firebase Console → Authentication → Settings → Authorized domains and add this domain.';
       }
       
-      showAuthError(message);
+      showAuthError(message, details);
       btn.disabled = false;
       btn.innerHTML = originalText;
     }
@@ -219,10 +236,16 @@
     }
   }
 
-  function showAuthError(message) {
+  function showAuthError(message, details = '') {
     const errorEl = document.getElementById('auth-error');
     if (errorEl) {
-      errorEl.textContent = message;
+      errorEl.innerHTML = `
+        <div class="error-icon">⚠️</div>
+        <div class="error-content">
+          <div class="error-title">${message}</div>
+          ${details ? `<div class="error-details">${details}</div>` : ''}
+        </div>
+      `;
       errorEl.style.display = 'block';
     }
   }
