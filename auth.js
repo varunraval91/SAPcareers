@@ -7,12 +7,24 @@
 (() => {
   let currentUser = null;
   let unsubscribeListener = null;
+  let initRetries = 0;
+  const MAX_INIT_RETRIES = 12;
 
   // ═══════════════════════════════════════════════════════════
   // INITIALIZATION
   // ═══════════════════════════════════════════════════════════
   function initAuth() {
     console.log('🔐 Auth: Checking Firebase...');
+
+    // Google auth popups do not work reliably from file:// origins.
+    if (window.location.protocol === 'file:') {
+      showAuthScreen();
+      showAuthError(
+        'Run this app on localhost (not file://)',
+        'Start a local server and open http://localhost:5500 (or similar). Example: python -m http.server 5500'
+      );
+      return;
+    }
     
     // Wait for Firebase API and initialization
     if (typeof FirebaseAPI === 'undefined') {
@@ -23,11 +35,22 @@
 
     // Wait for Firebase to actually be initialized
     if (!FirebaseAPI.isReady || !FirebaseAPI.isReady()) {
+      initRetries += 1;
+      if (initRetries > MAX_INIT_RETRIES) {
+        showAuthScreen();
+        showAuthError(
+          'Firebase failed to initialize',
+          'Check network access to Firebase CDN and verify firebase config in firebase-config.js.'
+        );
+        return;
+      }
+
       console.warn('⏳ Firebase not ready yet, retrying in 500ms...');
       setTimeout(initAuth, 500);
       return;
     }
 
+    initRetries = 0;
     console.log('✅ Firebase ready, initializing auth...');
     
     // Listen to auth state changes
@@ -98,25 +121,34 @@
     authScreen.id = 'auth-screen';
     authScreen.innerHTML = `
       <div class="auth-container">
-        <div class="auth-logo">
-          <span class="logo-mark">JH</span>
+        <div class="auth-card">
+          <div class="auth-logo">
+            <span class="auth-logo-icon">JH</span>
+          </div>
+          <h1 class="auth-title">Job Hunt HQ</h1>
+          <p class="auth-subtitle">Track applications and sync everything in Firebase</p>
+
+          <div class="auth-features">
+            <div class="feature"><span class="feature-icon">📊</span>Track applications</div>
+            <div class="feature"><span class="feature-icon">☁️</span>Cloud sync across devices</div>
+            <div class="feature"><span class="feature-icon">🔒</span>Google-secured login</div>
+          </div>
+
+          <button id="google-signin-btn" class="btn btn-primary btn-auth">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
+              <path d="M9.003 18c2.43 0 4.467-.806 5.956-2.18L12.05 13.56c-.806.54-1.836.86-3.047.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9.003 18z" fill="#34A853"/>
+              <path d="M3.964 10.712c-.18-.54-.282-1.117-.282-1.71 0-.593.102-1.17.282-1.71V4.96H.957C.347 6.175 0 7.55 0 9.002c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+              <path d="M9.003 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.464.891 11.428 0 9.003 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29c.708-2.127 2.692-3.71 5.036-3.71z" fill="#EA4335"/>
+            </svg>
+            Sign in with Google
+          </button>
+
+          <div id="auth-error" class="auth-error" style="display:none;"></div>
+
+          <p class="auth-footer">Origin: <code>${window.location.origin || 'file://'}</code></p>
+          <p class="auth-footer">Your data syncs to Firestore and is available on any device.</p>
         </div>
-        <h1 class="auth-title">Job Hunt HQ</h1>
-        <p class="auth-subtitle">Track your applications. Land your dream job.</p>
-        
-        <button id="google-signin-btn" class="btn btn-primary btn-auth">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
-            <path d="M9.003 18c2.43 0 4.467-.806 5.956-2.18L12.05 13.56c-.806.54-1.836.86-3.047.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9.003 18z" fill="#34A853"/>
-            <path d="M3.964 10.712c-.18-.54-.282-1.117-.282-1.71 0-.593.102-1.17.282-1.71V4.96H.957C.347 6.175 0 7.55 0 9.002c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
-            <path d="M9.003 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.464.891 11.428 0 9.003 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29c.708-2.127 2.692-3.71 5.036-3.71z" fill="#EA4335"/>
-          </svg>
-          Sign in with Google
-        </button>
-        
-        <div id="auth-error" class="auth-error" style="display:none;"></div>
-        
-        <p class="auth-footer">Your data is securely stored in the cloud and syncs across all your devices.</p>
       </div>
     `;
 
@@ -215,7 +247,13 @@
         details = 'Google Sign-In is not enabled. Please check Firebase Console.';
       } else if (error.code === 'auth/unauthorized-domain') {
         message = 'Domain not authorized';
-        details = 'This domain is not authorized for Google Sign-In. Go to Firebase Console → Authentication → Settings → Authorized domains and add this domain.';
+        details = `Add this domain in Firebase Auth > Settings > Authorized domains: ${window.location.hostname}`;
+      } else if (error.code === 'auth/invalid-api-key') {
+        message = 'Invalid Firebase API key';
+        details = 'Your firebase config is wrong for this project. Re-copy config from Firebase Console > Project Settings > General.';
+      } else if (error.code === 'auth/operation-not-supported-in-this-environment') {
+        message = 'Unsupported environment for popup sign-in';
+        details = 'Open this app via localhost/http instead of file:// and try again.';
       }
       
       showAuthError(message, details);

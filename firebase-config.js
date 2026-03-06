@@ -69,6 +69,10 @@ function signInWithGoogle() {
       return result.user;
     })
     .catch((error) => {
+      if (error && error.code === 'auth/popup-blocked') {
+        console.warn('Popup blocked, using redirect flow...');
+        return auth.signInWithRedirect(googleProvider);
+      }
       console.error('Sign-in error:', error);
       throw error;
     });
