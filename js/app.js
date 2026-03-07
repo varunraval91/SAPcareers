@@ -46,7 +46,7 @@
     currentSort: "deadline-asc",
     searchQuery: "",
     editingId: null,
-    theme: safeStorageGet(THEME_KEY) || "dark"
+    theme: safeStorageGet(THEME_KEY) || "light"
   };
 
   const DOM = {
@@ -1116,20 +1116,21 @@
 
   function renderKanban(onlyFollowup = false) {
     const filtered = getFilteredApplications().filter((app) => (onlyFollowup ? isFollowupDue(app) : true));
-    const visibleStages = state.currentFilter !== "all" ? [state.currentFilter] : STAGES;
+    const visibleStages = STAGES;
 
     DOM.kanbanBoard.innerHTML = visibleStages.map((stage) => {
       const stageItems = filtered.filter((a) => a.stage === stage);
+      const stageSlug = stage.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
       return `
-        <div class="kanban-column">
-          <div class="column-header">
+        <section class="kanban-column" data-stage="${stage}">
+          <div class="column-header stage-${stageSlug}">
             <div class="column-title">${stage}</div>
             <div class="column-count">${stageItems.length}</div>
           </div>
-          <div class="column-list" id="column-${stage.replace(/[^a-zA-Z0-9]/g, "")}">
-            ${stageItems.length === 0 ? "<div class=\"text-muted\">No applications</div>" : ""}
+          <div class="column-list" id="column-${stage.replace(/[^a-zA-Z0-9]/g, "")}" data-stage="${stage}">
+            ${stageItems.length === 0 ? `<div class="empty-column"><div class="empty-icon">+</div><div class="empty-text">Drop here or add new</div></div>` : ""}
           </div>
-        </div>
+        </section>
       `;
     }).join("");
 
@@ -1139,41 +1140,133 @@
       const items = filtered.filter((a) => a.stage === stage);
       items.forEach((app) => container.appendChild(renderCard(app)));
     });
+
+    bindKanbanDnD();
   }
 
   function renderCard(app) {
     const card = document.createElement("article");
     const urgency = getUrgency(app.deadline);
-    card.className = `card urgent-${urgency}`;
+    card.className = `kanban-card urgent-${urgency}`;
+    card.draggable = true;
+    card.dataset.appId = app.id;
 
-    const postingText = app.postingDate ? formatDate(app.postingDate) : "-";
     const deadlineText = app.deadline ? formatDate(app.deadline) : "-";
+    const companyInitial = String(app.company || "?").trim().charAt(0).toUpperCase() || "?";
+    const stageSlug = String(app.stage || "applied").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
 
     card.innerHTML = `
-      <div class="card-header">
-        <div>
-          <p class="card-company">${escapeHtml(app.company)}${app.location ? ' &middot; ' + escapeHtml(app.location) : ''}</p>
-          <h4 class="card-title">${escapeHtml(app.role)}</h4>
+      <div class="card-head-row">
+        <div class="card-brand">
+          <div class="company-avatar">${escapeHtml(companyInitial)}</div>
+          <div>
+            <p class="card-company">${escapeHtml(app.company || "Unknown Company")}</p>
+            <p class="card-location">${escapeHtml(app.location || "No location")}</p>
+          </div>
         </div>
+        <details class="card-menu-wrap">
+          <summary class="card-menu-btn" aria-label="Card actions">...</summary>
+          <div class="card-menu">
+            <button type="button" data-action="edit">Edit</button>
+            <button type="button" data-action="delete">Delete</button>
+          </div>
+        </details>
       </div>
-      <div class="card-meta">
-        <span class="card-meta-item">Post: ${postingText}</span>
-        <span class="card-meta-item">Deadline: ${deadlineText}</span>
+
+      <h4 class="card-title">${escapeHtml(app.role || "Untitled role")}</h4>
+
+      <div class="card-meta-row">
+        <span class="card-meta-item">${app.deadline ? `Due ${deadlineText}` : "No deadline"}</span>
+        <span class="card-meta-item">ID ${escapeHtml(app.reqId || "N/A")}</span>
       </div>
-      ${app.reqId ? `<div class="card-meta-item">Requisition ID: ${escapeHtml(app.reqId)}</div>` : ""}
-      ${app.contactType || app.contactName ? `<div class="card-meta-item">Contact: ${escapeHtml([app.contactType, app.contactName].filter(Boolean).join(" - "))}</div>` : ""}
-      ${app.link ? `<a href="${escapeAttr(app.link)}" target="_blank" rel="noopener noreferrer">Open Job Link</a>` : ""}
+
+      <div class="card-footer-row">
+        <span class="stage-pill stage-pill-${stageSlug}">${escapeHtml(app.stage || "Applied")}</span>
+        ${app.link ? `<a class="open-link-btn" href="${escapeAttr(app.link)}" target="_blank" rel="noopener noreferrer">Open</a>` : ""}
+      </div>
+
       ${app.notes ? `<div class="card-notes">${escapeHtml(app.notes)}</div>` : ""}
-      <div class="card-actions">
-        <button type="button" data-action="edit">Edit</button>
-        <button type="button" data-action="delete">Delete</button>
-      </div>
     `;
 
-    card.querySelector('[data-action="edit"]').addEventListener("click", () => openModal(app.id));
-    card.querySelector('[data-action="delete"]').addEventListener("click", () => deleteApplication(app.id));
+    const editBtn = card.querySelector('[data-action="edit"]');
+    const deleteBtn = card.querySelector('[data-action="delete"]');
+
+    if (editBtn) {
+      editBtn.addEventListener("click", () => openModal(app.id));
+    }
+    if (deleteBtn) {
+      deleteBtn.addEventListener("click", () => deleteApplication(app.id));
+    }
+
+    card.addEventListener("dragstart", (event) => {
+      event.dataTransfer.setData("text/plain", app.id);
+      event.dataTransfer.effectAllowed = "move";
+      card.classList.add("dragging");
+    });
+
+    card.addEventListener("dragend", () => {
+      card.classList.remove("dragging");
+    });
 
     return card;
+  }
+
+  function bindKanbanDnD() {
+    document.querySelectorAll(".column-list").forEach((column) => {
+      column.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        column.classList.add("drag-over");
+      });
+
+      column.addEventListener("dragleave", () => {
+        column.classList.remove("drag-over");
+      });
+
+      column.addEventListener("drop", (event) => {
+        event.preventDefault();
+        column.classList.remove("drag-over");
+
+        const appId = event.dataTransfer.getData("text/plain");
+        const targetStage = column.dataset.stage;
+        if (!appId || !targetStage) {
+          return;
+        }
+
+        moveApplicationToStage(appId, targetStage);
+      });
+    });
+  }
+
+  function moveApplicationToStage(appId, targetStage) {
+    const appIndex = state.applications.findIndex((item) => item.id === appId);
+    if (appIndex < 0) {
+      return;
+    }
+
+    const current = state.applications[appIndex];
+    if (current.stage === targetStage) {
+      return;
+    }
+
+    state.applications[appIndex] = {
+      ...current,
+      stage: targetStage,
+      updatedAt: new Date().toISOString()
+    };
+
+    if (useFirebase && currentUserId) {
+      FirebaseAPI.db.saveApplication(currentUserId, state.applications[appIndex])
+        .catch((error) => {
+          console.error("Failed to save dragged stage update:", error);
+          showToast("Could not update stage in cloud", "error");
+        });
+    } else {
+      saveApplications();
+    }
+
+    renderUI();
+    showToast(`Moved to ${targetStage}`);
   }
 
   function deleteApplication(id) {

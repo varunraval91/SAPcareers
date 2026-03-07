@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/redesign.css" />
   <link rel="stylesheet" href="css/auth-screen-styles.css" />
 </head>
 <body>
@@ -74,11 +75,8 @@
         <span class="logo-text">Job and Internship Tracking</span>
       </div>
       <nav class="sidebar-nav">
-        <a href="#" class="nav-item active" data-view="dashboard">
-          <span class="nav-icon">▦</span> Dashboard
-        </a>
-        <a href="#" class="nav-item" data-view="analytics">
-          <span class="nav-icon">◎</span> Analytics
+        <a href="#" class="nav-item active" data-view="dashboard" title="Dashboard">
+          <span class="nav-icon">▦</span> <span class="nav-label">Dashboard</span>
         </a>
       </nav>
       <div class="sidebar-footer">
@@ -114,18 +112,6 @@
           </button>
         </div>
       </header>
-
-      <!-- ─── MOTIVATIONAL QUOTE BLOCK ─── -->
-      <section class="quote-section" id="quote-section" aria-label="Daily motivation">
-        <div class="quote-card" id="quote-card">
-          <span class="quote-decoration">"</span>
-          <p class="quote-text" id="quote-text"></p>
-          <div class="quote-footer">
-            <span class="quote-tag" id="quote-tag"></span>
-            <button class="quote-shuffle-btn" id="quote-shuffle-btn" aria-label="Shuffle quote" title="New quote">↻</button>
-          </div>
-        </div>
-      </section>
 
       <!-- ─── WEEKLY GOAL WIDGET ─── -->
       <section class="goal-section" id="goal-section">
@@ -247,7 +233,6 @@
   <script src="js/auth.js"></script>
 
   <!-- App Scripts -->
-  <script src="js/quotes.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="js/app.js"></script>
 </body>
