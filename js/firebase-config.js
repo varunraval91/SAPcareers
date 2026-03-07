@@ -1,29 +1,18 @@
 /**
- * ═══════════════════════════════════════════════════════════════
- * FIREBASE CONFIGURATION
- * ═══════════════════════════════════════════════════════════════
- * 
- * SETUP INSTRUCTIONS:
- * 1. Ask Perplexity to create Firebase project (use prompt above)
- * 2. Copy the firebaseConfig object Perplexity gives you
- * 3. Replace the placeholder config below with your real config
- * 4. Enable Firestore Database in Firebase Console
- * 5. Enable Anonymous Authentication in Firebase Console
- * 6. Deploy and test
+ * Firebase config for Job and Internship Application Tracking Pipeline.
+ *
+ * IMPORTANT:
+ * - Never commit real Firebase credentials to a public repository.
+ * - Replace the placeholder values below with your own Firebase project values.
  */
-
-// ═══════════════════════════════════════════════════════════════
-// Firebase Configuration (from Firebase Console)
-// Project: jobs-progress-tracker
-// ═══════════════════════════════════════════════════════════════
 const firebaseConfig = {
-  apiKey: "AIzaSyDG0VBXMrUdxzpw3Hwwrsr_oRtiVg_vSuM",
-  authDomain: "jobs-progress-tracker.firebaseapp.com",
-  projectId: "jobs-progress-tracker",
-  storageBucket: "jobs-progress-tracker.firebasestorage.app",
-  messagingSenderId: "556518693770",
-  appId: "1:556518693770:web:2df595285bf3ec199f0673",
-  measurementId: "G-8JNFN5X2RE"
+  apiKey: "YOUR_FIREBASE_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID",
+  measurementId: "YOUR_MEASUREMENT_ID"
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -33,17 +22,21 @@ let app, auth, db;
 
 function initializeFirebase() {
   try {
-    // Check if Firebase is loaded
     if (typeof firebase === 'undefined') {
       console.error('Firebase SDK not loaded. Check internet connection.');
       return false;
     }
 
-    // Initialize Firebase
+    const hasPlaceholderConfig = Object.values(firebaseConfig).some((v) => String(v).includes('YOUR_'));
+    if (hasPlaceholderConfig) {
+      console.error('Firebase config placeholders detected. Update js/firebase-config.js with your project values.');
+      return false;
+    }
+
     app = firebase.initializeApp(firebaseConfig);
     auth = firebase.auth();
     db = firebase.firestore();
-    // Enable offline persistence
+
     db.enablePersistence({ synchronizeTabs: true })
       .catch((err) => {
         console.warn('Firestore persistence error:', err.code);
@@ -58,21 +51,8 @@ function initializeFirebase() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// AUTHENTICATION HELPERS (ANONYMOUS PERSONAL MODE)
+// AUTHENTICATION HELPERS (EMAIL SIGN-IN MODE)
 // ═══════════════════════════════════════════════════════════════
-function signInAnonymously() {
-  // Keep anonymous user session across refreshes in this browser.
-  return auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
-    .then(() => auth.signInAnonymously())
-    .then((result) => {
-      console.log('✅ Signed in anonymously:', result.user.uid);
-      return result.user;
-    })
-    .catch((error) => {
-      console.error('Anonymous sign-in error:', error);
-      throw error;
-    });
-}
 
 function signOut() {
   return auth.signOut()
@@ -98,71 +78,6 @@ function signInWithEmail(email, password) {
     });
 }
 
-function createUserWithEmail(email, password) {
-  return auth.createUserWithEmailAndPassword(email, password)
-    .then((result) => {
-      console.log('✅ Email user created:', result.user.uid);
-      return result.user;
-    })
-    .catch((error) => {
-      console.error('Email user creation error:', error);
-      throw error;
-    });
-}
-
-async function upgradeAnonymousToEmail(email, password) {
-  const anonymousUser = auth.currentUser;
-  if (!anonymousUser) {
-    throw new Error('No active user. Sign in anonymously first.');
-  }
-  if (!anonymousUser.isAnonymous) {
-    return anonymousUser; // Already permanent account
-  }
-
-  const anonymousUid = anonymousUser.uid;
-  console.log('🔄 Migrating data from anonymous account:', anonymousUid);
-
-  try {
-    // Step 1: Fetch all data from anonymous user
-    const snapshot = await db.collection('users').doc(anonymousUid)
-      .collection('applications').get();
-    const applications = [];
-    snapshot.forEach(doc => applications.push({ id: doc.id, ...doc.data() }));
-    console.log(`📦 Found ${applications.length} applications to migrate`);
-
-    // Step 2: Create new email/password account
-    const credential = await auth.createUserWithEmailAndPassword(email, password);
-    const newUser = credential.user;
-    const newUid = newUser.uid;
-    console.log('✅ New email account created:', newUid);
-
-    // Step 3: Copy all applications to new user
-    const batch = db.batch();
-    applications.forEach(app => {
-      const newRef = db.collection('users').doc(newUid)
-        .collection('applications').doc(app.id);
-      batch.set(newRef, app);
-    });
-    await batch.commit();
-    console.log(`✅ Migrated ${applications.length} applications to new account`);
-
-    // Step 4: Delete old anonymous data (optional cleanup)
-    try {
-      const deletePromises = [];
-      snapshot.forEach(doc => deletePromises.push(doc.ref.delete()));
-      await Promise.all(deletePromises);
-      await anonymousUser.delete();
-      console.log('🗑️ Cleaned up old anonymous account');
-    } catch (cleanupError) {
-      console.warn('Cleanup warning (non-critical):', cleanupError);
-    }
-
-    return newUser;
-  } catch (error) {
-    console.error('Migration error:', error);
-    throw error;
-  }
-}
 
 function getCurrentUser() {
   return auth.currentUser;
@@ -324,10 +239,7 @@ window.FirebaseAPI = {
   initialize: initializeFirebase,
   isReady: () => !!auth && !!db,
   auth: {
-    signInAnonymously,
     signInWithEmail,
-    createUserWithEmail,
-    upgradeAnonymousToEmail,
     signOut,
     getCurrentUser,
     onAuthStateChanged

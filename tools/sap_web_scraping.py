@@ -1,11 +1,12 @@
 import csv
+import os
 from playwright.sync_api import sync_playwright
 
-# Option A: Put the direct URL of the "My Applications" page if you have it.
-# Option B: Put the career site URL and navigate after login.
-APPLICATIONS_URL ="https://career5.successfactors.eu/portalcareer?company=SAP&rcm%5fsite%5flocale=en%5fUS&&navBarLevel=MY_PROFILE&_s.crb=aHCG167iVEGk1%252blzQGZ3nlXUAOz2%252bBd7UEVJPCe4vvk%253d"
+# Set this to your own portal URL at runtime.
+# Example: https://career5.successfactors.eu/portalcareer?company=SAP
+APPLICATIONS_URL = os.environ.get("APPLICATIONS_URL", "https://example.com/my-applications")
 
-OUT_CSV = "sap_applied_jobs.csv"
+OUT_CSV = "data/sample_applications.csv"
 
 
 def export_table_to_csv(page, out_csv: str) -> int:
@@ -60,6 +61,11 @@ def export_table_to_csv(page, out_csv: str) -> int:
 
 
 def main():
+    if "example.com" in APPLICATIONS_URL:
+        raise RuntimeError(
+            "Set APPLICATIONS_URL env var to your own portal URL before running."
+        )
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)  # shows the browser so you can login
         context = browser.new_context()

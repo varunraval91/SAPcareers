@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Node/local tooling
+node_modules/
+
+# OS/editor artifacts
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Local secrets (optional pattern if you externalize config)
+js/firebase-config.local.js
