@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Internship Application Pipeline</title>
+  <title>Job and Internship Application Tracking Pipeline</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -11,6 +11,42 @@
   <link rel="stylesheet" href="auth-screen-styles.css" />
 </head>
 <body>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- LOGIN SCREEN (FIRST PAGE)              -->
+  <!-- ═══════════════════════════════════════ -->
+  <section id="auth-screen" role="region" aria-label="Sign in to continue">
+    <div class="auth-container">
+      <div class="auth-bg-decoration" aria-hidden="true"></div>
+      <div class="auth-card">
+        <div class="auth-header">
+          <div class="auth-logo">
+            <div class="auth-logo-icon">JP</div>
+          </div>
+          <h1 class="auth-title">Job and Internship Application Tracking Pipeline</h1>
+          <p class="auth-subtitle">Sign in to access your dashboard, KPI cards, and kanban board.</p>
+        </div>
+
+        <div class="auth-quote" id="auth-quote">"Small daily progress leads to extraordinary career outcomes."</div>
+
+        <form id="auth-login-form" class="auth-form" autocomplete="on">
+          <label for="auth-email-input">Email</label>
+          <input id="auth-email-input" type="email" required placeholder="you@example.com" autocomplete="email" />
+
+          <label for="auth-password-input">Password</label>
+          <input id="auth-password-input" type="password" required minlength="6" placeholder="Enter password" autocomplete="current-password" />
+
+          <div id="auth-error" class="auth-error hidden" role="alert"></div>
+          <button id="auth-login-btn" type="submit" class="btn-auth">Sign In</button>
+        </form>
+
+        <p class="auth-footer">
+          <span class="footer-icon">🔒</span>
+          Secure access required. Contact admin if account is not created yet.
+        </p>
+      </div>
+    </div>
+  </section>
 
   <!-- ═══════════════════════════════════════ -->
   <!-- TOAST CONTAINER                         -->
@@ -29,13 +65,13 @@
   <!-- ═══════════════════════════════════════ -->
   <!-- MAIN LAYOUT                             -->
   <!-- ═══════════════════════════════════════ -->
-  <div class="app-layout">
+  <div class="app-layout hidden" id="app-layout">
 
     <!-- SIDEBAR (desktop only) -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-logo">
         <span class="logo-mark">IAP</span>
-        <span class="logo-text">Internship Application Pipeline</span>
+        <span class="logo-text">Job and Internship Tracking</span>
       </div>
       <nav class="sidebar-nav">
         <a href="#" class="nav-item active" data-view="dashboard">
@@ -46,14 +82,11 @@
         </a>
       </nav>
       <div class="sidebar-footer">
-        <div id="account-status" class="account-status" title="Current authentication status">Guest session</div>
+        <div id="account-status" class="account-status" title="Current authentication status">Signed out</div>
         <button id="theme-toggle" aria-label="Toggle theme">
           <span id="theme-icon">☀</span>
         </button>
-        <button id="account-sync-btn" title="Open login and sync panel">
-          ☁ Account Login / Sync
-        </button>
-        <button id="account-logout-btn" title="Sign out from email account and return to guest mode">
+        <button id="account-logout-btn" title="Sign out from your account">
           ⇥ Logout
         </button>
         <button id="import-data-btn" title="Import applications from CSV/Excel">
@@ -72,7 +105,7 @@
       <!-- ─── TOP BAR ─── -->
       <header class="topbar">
         <div class="topbar-left">
-          <h1 class="app-title">Internship Application Pipeline</h1>
+          <h1 class="app-title">Job and Internship Application Tracking Pipeline</h1>
           <p class="app-subtitle">Track every move. Stay relentless.</p>
         </div>
         <div class="topbar-right">

@@ -40,7 +40,7 @@
   }
 
   const state = {
-    applications: loadApplications(),
+    applications: [],
     currentWeeklyGoal: parseInt(safeStorageGet(GOAL_KEY), 10) || 10,
     currentFilter: "all",
     currentSort: "deadline-asc",
@@ -56,7 +56,6 @@
     themeToggle: document.getElementById("theme-toggle"),
     themeIcon: document.getElementById("theme-icon"),
     accountStatus: document.getElementById("account-status"),
-    accountSyncBtn: document.getElementById("account-sync-btn"),
     accountLogoutBtn: document.getElementById("account-logout-btn"),
     importBtn: document.getElementById("import-data-btn"),
     importFileInput: document.getElementById("import-file-input"),
@@ -117,7 +116,6 @@
 
   function bindEvents() {
     addListener(DOM.themeToggle, "click", toggleTheme);
-    addListener(DOM.accountSyncBtn, "click", openAccountSyncFlow);
     addListener(DOM.accountLogoutBtn, "click", handleLogout);
     addListener(DOM.importBtn, "click", () => {
       if (DOM.importFileInput) {
@@ -224,135 +222,6 @@
     showToast(`Switched to ${state.theme} mode`);
   }
 
-  function openAccountSyncFlow() {
-    if (typeof FirebaseAPI === "undefined" || !FirebaseAPI.auth) {
-      showToast("Firebase not ready yet", "warning");
-      return;
-    }
-
-    DOM.modalBox.innerHTML = `
-      <div class="auth-panel">
-        <div class="auth-panel-title">Account Login & Sync</div>
-        <div class="auth-panel-subtitle">Use one email account across browsers/devices. Existing guest data can be upgraded safely.</div>
-
-        <div class="form-group">
-          <label for="auth-email">Email</label>
-          <input type="email" id="auth-email" placeholder="you@example.com" />
-        </div>
-
-        <div class="form-group">
-          <label for="auth-password">Password</label>
-          <input type="password" id="auth-password" placeholder="Minimum 6 characters" />
-        </div>
-
-        <div class="form-group" style="margin:0;display:flex;gap:0.5rem;align-items:flex-start;">
-          <input type="checkbox" id="auth-upgrade-guest" checked />
-          <label for="auth-upgrade-guest" style="margin:0;">If currently in guest mode, migrate all guest applications to this email account.</label>
-        </div>
-
-        <div id="auth-status" class="text-muted" style="font-size:var(--text-sm);min-height:1.2rem;"></div>
-
-        <div class="auth-panel-actions">
-          <button type="button" class="btn btn-secondary" id="auth-close-btn">Cancel</button>
-          <button type="button" class="btn btn-primary" id="auth-signin-btn">Sign In</button>
-          <button type="button" class="btn btn-secondary" id="auth-create-btn">Create Account</button>
-          <button type="button" class="btn btn-primary" id="auth-upgrade-btn">Create & Migrate Guest Data</button>
-        </div>
-      </div>
-    `;
-
-    DOM.modalBackdrop.classList.remove("hidden");
-
-    const emailEl = document.getElementById("auth-email");
-    const passwordEl = document.getElementById("auth-password");
-    const upgradeEl = document.getElementById("auth-upgrade-guest");
-    const statusEl = document.getElementById("auth-status");
-    const closeBtn = document.getElementById("auth-close-btn");
-    const signInBtn = document.getElementById("auth-signin-btn");
-    const createBtn = document.getElementById("auth-create-btn");
-    const upgradeBtn = document.getElementById("auth-upgrade-btn");
-
-    const setBusy = (busy, message = "") => {
-      [signInBtn, createBtn, upgradeBtn, closeBtn, emailEl, passwordEl, upgradeEl].forEach((el) => {
-        if (el) el.disabled = busy;
-      });
-      if (statusEl) {
-        statusEl.textContent = message;
-      }
-    };
-
-    const readCreds = () => {
-      const email = (emailEl?.value || "").trim();
-      const password = passwordEl?.value || "";
-      if (!email || !email.includes("@")) {
-        throw new Error("Enter a valid email");
-      }
-      if (!password || password.length < 6) {
-        throw new Error("Password must be at least 6 characters");
-      }
-      return { email, password };
-    };
-
-    const mapAuthError = (error) => {
-      const code = error && error.code ? error.code : "";
-      if (code === "auth/email-already-in-use") return "Email already exists. Use Sign In.";
-      if (code === "auth/wrong-password" || code === "auth/invalid-credential") return "Wrong email/password";
-      if (code === "auth/user-not-found") return "Account not found. Create account first.";
-      if (code === "auth/operation-not-allowed") return "Email/password provider is disabled in Firebase.";
-      return (error && error.message) || "Authentication failed";
-    };
-
-    closeBtn?.addEventListener("click", closeModal);
-
-    signInBtn?.addEventListener("click", async () => {
-      try {
-        const { email, password } = readCreds();
-        setBusy(true, "Signing in...");
-        await FirebaseAPI.auth.signInWithEmail(email, password);
-        closeModal();
-        showToast("Signed in. Syncing data from cloud...");
-      } catch (error) {
-        showToast(mapAuthError(error), "error");
-        setBusy(false, "");
-      }
-    });
-
-    createBtn?.addEventListener("click", async () => {
-      try {
-        const { email, password } = readCreds();
-        setBusy(true, "Creating account...");
-        await FirebaseAPI.auth.createUserWithEmail(email, password);
-        closeModal();
-        showToast("Account created successfully");
-      } catch (error) {
-        showToast(mapAuthError(error), "error");
-        setBusy(false, "");
-      }
-    });
-
-    upgradeBtn?.addEventListener("click", async () => {
-      try {
-        const { email, password } = readCreds();
-        const shouldMigrate = Boolean(upgradeEl?.checked);
-        setBusy(true, shouldMigrate ? "Migrating guest data to new account..." : "Creating account...");
-
-        if (shouldMigrate) {
-          await FirebaseAPI.auth.upgradeAnonymousToEmail(email, password);
-          closeModal();
-          showToast("Guest account upgraded and data migrated");
-          return;
-        }
-
-        await FirebaseAPI.auth.createUserWithEmail(email, password);
-        closeModal();
-        showToast("Account created successfully");
-      } catch (error) {
-        showToast(mapAuthError(error), "error");
-        setBusy(false, "");
-      }
-    });
-  }
-
   async function handleLogout() {
     if (typeof FirebaseAPI === "undefined" || !FirebaseAPI.auth) {
       showToast("Firebase not ready yet", "warning");
@@ -361,7 +230,7 @@
 
     try {
       await FirebaseAPI.auth.signOut();
-      showToast("Logged out. Guest session will start automatically.", "info");
+      showToast("Logged out", "info");
     } catch (error) {
       showToast((error && error.message) || "Logout failed", "error");
     }
@@ -370,11 +239,7 @@
   function updateAccountStatusUI(user) {
     if (!DOM.accountStatus) return;
     if (!user) {
-      DOM.accountStatus.textContent = "No session";
-      return;
-    }
-    if (user.isAnonymous) {
-      DOM.accountStatus.textContent = "Guest session";
+      DOM.accountStatus.textContent = "Signed out";
       return;
     }
     DOM.accountStatus.textContent = user.email || "Email account";
@@ -389,6 +254,11 @@
   }
 
   function openModal(editId = null) {
+    if (!currentUserId) {
+      showToast("Please sign in first", "warning");
+      return;
+    }
+
     state.editingId = editId;
     const isEdit = Boolean(editId);
     const app = isEdit
@@ -1833,6 +1703,12 @@
         renderGoal();
       },
       setAuthUser: (user) => {
+        if (!user) {
+          currentUserId = null;
+          useFirebase = false;
+          state.applications = [];
+          renderUI();
+        }
         updateAccountStatusUI(user);
       },
       init: loadUserDataAndRender
