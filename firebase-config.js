@@ -85,6 +85,52 @@ function signOut() {
     });
 }
 
+function signInWithEmail(email, password) {
+  return auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+    .then(() => auth.signInWithEmailAndPassword(email, password))
+    .then((result) => {
+      console.log('✅ Signed in with email:', result.user.uid);
+      return result.user;
+    })
+    .catch((error) => {
+      console.error('Email sign-in error:', error);
+      throw error;
+    });
+}
+
+function createUserWithEmail(email, password) {
+  return auth.createUserWithEmailAndPassword(email, password)
+    .then((result) => {
+      console.log('✅ Email user created:', result.user.uid);
+      return result.user;
+    })
+    .catch((error) => {
+      console.error('Email user creation error:', error);
+      throw error;
+    });
+}
+
+function linkAnonymousToEmail(email, password) {
+  const user = auth.currentUser;
+  if (!user) {
+    return Promise.reject(new Error('No active user to link. Sign in anonymously first.'));
+  }
+  if (!user.isAnonymous) {
+    return Promise.resolve(user);
+  }
+
+  const credential = firebase.auth.EmailAuthProvider.credential(email, password);
+  return user.linkWithCredential(credential)
+    .then((result) => {
+      console.log('✅ Anonymous account linked to email:', result.user.uid);
+      return result.user;
+    })
+    .catch((error) => {
+      console.error('Anonymous link error:', error);
+      throw error;
+    });
+}
+
 function getCurrentUser() {
   return auth.currentUser;
 }
@@ -246,6 +292,9 @@ window.FirebaseAPI = {
   isReady: () => !!auth && !!db,
   auth: {
     signInAnonymously,
+    signInWithEmail,
+    createUserWithEmail,
+    linkAnonymousToEmail,
     signOut,
     getCurrentUser,
     onAuthStateChanged

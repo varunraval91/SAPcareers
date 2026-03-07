@@ -55,6 +55,7 @@
     modalBox: document.getElementById("modal-box"),
     themeToggle: document.getElementById("theme-toggle"),
     themeIcon: document.getElementById("theme-icon"),
+    accountSyncBtn: document.getElementById("account-sync-btn"),
     importBtn: document.getElementById("import-data-btn"),
     importFileInput: document.getElementById("import-file-input"),
     exportCsvBtn: document.getElementById("export-csv-btn"),
@@ -107,6 +108,7 @@
 
   function bindEvents() {
     addListener(DOM.themeToggle, "click", toggleTheme);
+    addListener(DOM.accountSyncBtn, "click", openAccountSyncFlow);
     addListener(DOM.importBtn, "click", () => {
       if (DOM.importFileInput) {
         DOM.importFileInput.click();
@@ -210,6 +212,69 @@
     
     setupTheme();
     showToast(`Switched to ${state.theme} mode`);
+  }
+
+  async function openAccountSyncFlow() {
+    if (typeof FirebaseAPI === "undefined" || !FirebaseAPI.auth) {
+      showToast("Firebase not ready yet", "warning");
+      return;
+    }
+
+    const mode = window.prompt(
+      "Account Sync\n\n1 = Link current data to email (first-time setup)\n2 = Sign in with existing email (new browser/device)",
+      "1"
+    );
+    if (mode === null) return;
+
+    const email = (window.prompt("Enter email") || "").trim();
+    if (!email || !email.includes("@")) {
+      showToast("Enter a valid email", "error");
+      return;
+    }
+
+    const password = window.prompt("Enter password (min 6 chars)") || "";
+    if (!password || password.length < 6) {
+      showToast("Password must be at least 6 characters", "error");
+      return;
+    }
+
+    try {
+      if (mode.trim() === "2") {
+        await FirebaseAPI.auth.signInWithEmail(email, password);
+        showToast("Signed in. Syncing data from cloud...");
+        return;
+      }
+
+      const current = FirebaseAPI.auth.getCurrentUser();
+      if (!current) {
+        showToast("No active session. Reload and retry.", "warning");
+        return;
+      }
+
+      if (current.isAnonymous) {
+        await FirebaseAPI.auth.linkAnonymousToEmail(email, password);
+        showToast("Account linked. Use this email on all devices.");
+      } else {
+        // Already linked account: sign in on this device to ensure credentials are valid.
+        await FirebaseAPI.auth.signInWithEmail(email, password);
+        showToast("Email account already active.");
+      }
+    } catch (error) {
+      const code = error && error.code ? error.code : "";
+      if (code === "auth/email-already-in-use") {
+        showToast("Email already linked. Use option 2 to sign in.", "warning");
+        return;
+      }
+      if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
+        showToast("Wrong email/password", "error");
+        return;
+      }
+      if (code === "auth/user-not-found") {
+        showToast("Account not found. Use option 1 on original browser first.", "warning");
+        return;
+      }
+      showToast((error && error.message) || "Account sync failed", "error");
+    }
   }
 
   function renderUI() {
@@ -582,14 +647,34 @@
 
   // ── Fetch job page for structured data (JSON-LD / meta) ──
   async function fetchJobPageDetails(url) {
-    try {
-      const resp = await fetch(url, { redirect: 'follow' });
-      if (!resp.ok) return null;
-      const html = await resp.text();
+    const extractPostingDateFromText = (text) => {
+      if (!text) return "";
+
+      // Direct ISO-like date first
+      const iso = extractDateFromString(text);
+      if (iso) return iso;
+
+      // SAP style: Tue Feb 24 00:00:00 UTC 2026
+      const sapLong = text.match(/datePosted[^\n\r<]{0,120}([A-Za-z]{3}\s+[A-Za-z]{3}\s+\d{1,2}[^\n\r<]{0,30}\d{4})/i);
+      if (sapLong && sapLong[1]) {
+        const parsed = new Date(sapLong[1]);
+        if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+      }
+
+      // Human-readable fallback: Feb 24, 2026
+      const friendly = text.match(/(?:posted|date\s*posted|published)[^\n\r<]{0,40}([A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4})/i);
+      if (friendly && friendly[1]) {
+        const parsed = new Date(friendly[1]);
+        if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+      }
+
+      return "";
+    };
+
+    const parseHtmlForJobMeta = (html) => {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
 
-      // Try JSON-LD
       for (const script of doc.querySelectorAll('script[type="application/ld+json"]')) {
         try {
           let data = JSON.parse(script.textContent);
@@ -609,10 +694,11 @@
               reqId: data.identifier?.value || data.identifier?.name || ''
             };
           }
-        } catch { /* ignore bad JSON */ }
+        } catch {
+          // ignore malformed JSON-LD blocks
+        }
       }
 
-      // Fallback: meta tags (itemprop, og, etc.)
       let postingDate = '';
       const datePostedMeta = doc.querySelector('meta[itemprop="datePosted"]');
       if (datePostedMeta) {
@@ -620,15 +706,38 @@
         const d = new Date(raw);
         if (!isNaN(d.getTime())) postingDate = d.toISOString().slice(0, 10);
       }
+
+      if (!postingDate) {
+        postingDate = extractPostingDateFromText(html);
+      }
+
       const ogTitle = doc.querySelector('meta[property="og:title"]');
       const title = ogTitle ? ogTitle.content : '';
       if (postingDate || title) {
         return { title, postingDate, company: '', location: '', reqId: '' };
       }
       return null;
-    } catch {
-      return null; // CORS or network error
+    };
+
+    const attempts = [
+      url,
+      `https://r.jina.ai/http://${String(url).replace(/^https?:\/\//, '')}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+    ];
+
+    for (const attemptUrl of attempts) {
+      try {
+        const resp = await fetch(attemptUrl, { redirect: 'follow' });
+        if (!resp.ok) continue;
+        const html = await resp.text();
+        const parsed = parseHtmlForJobMeta(html);
+        if (parsed) return parsed;
+      } catch {
+        // continue trying next fallback endpoint
+      }
     }
+
+    return null;
   }
 
   function inferFromJobLink(rawLink) {
@@ -848,8 +957,9 @@
 
   function renderKanban(onlyFollowup = false) {
     const filtered = getFilteredApplications().filter((app) => (onlyFollowup ? isFollowupDue(app) : true));
+    const visibleStages = state.currentFilter !== "all" ? [state.currentFilter] : STAGES;
 
-    DOM.kanbanBoard.innerHTML = STAGES.map((stage) => {
+    DOM.kanbanBoard.innerHTML = visibleStages.map((stage) => {
       const stageItems = filtered.filter((a) => a.stage === stage);
       return `
         <div class="kanban-column">
@@ -864,7 +974,7 @@
       `;
     }).join("");
 
-    STAGES.forEach((stage) => {
+    visibleStages.forEach((stage) => {
       const id = `column-${stage.replace(/[^a-zA-Z0-9]/g, "")}`;
       const container = document.getElementById(id);
       const items = filtered.filter((a) => a.stage === stage);
