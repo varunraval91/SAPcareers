@@ -109,11 +109,13 @@
   function initAuth() {
     if (window.location.protocol === 'file:') {
       console.warn('Running on file:// – Firebase requires localhost');
+      setLoginBusy(false, 'Open via localhost (for example Live Server), not file://');
       return;
     }
 
     if (typeof FirebaseAPI === 'undefined') {
       console.error('FirebaseAPI not available');
+      setLoginBusy(false, 'Firebase scripts not loaded. Check internet and script imports.');
       return;
     }
 
@@ -121,6 +123,7 @@
       initRetries += 1;
       if (initRetries > MAX_INIT_RETRIES) {
         console.error('Firebase failed to initialize after retries');
+        setLoginBusy(false, 'Firebase is not initialized. Update js/firebase-config.js and verify Firebase project settings.');
         return;
       }
       setTimeout(initAuth, 500);

@@ -3,9 +3,10 @@
  *
  * IMPORTANT:
  * - Never commit real Firebase credentials to a public repository.
- * - Replace the placeholder values below with your own Firebase project values.
+ * - Put real credentials in js/firebase-config.local.js (gitignored).
+ * - Keep placeholders here for safe commits.
  */
-const firebaseConfig = {
+const defaultFirebaseConfig = {
   apiKey: "YOUR_FIREBASE_API_KEY",
   authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
   projectId: "YOUR_PROJECT_ID",
@@ -14,6 +15,13 @@ const firebaseConfig = {
   appId: "YOUR_APP_ID",
   measurementId: "YOUR_MEASUREMENT_ID"
 };
+
+const firebaseConfig =
+  typeof window !== "undefined" &&
+  window.__FIREBASE_CONFIG__ &&
+  typeof window.__FIREBASE_CONFIG__ === "object"
+    ? window.__FIREBASE_CONFIG__
+    : defaultFirebaseConfig;
 
 // ═══════════════════════════════════════════════════════════════
 // INITIALIZE FIREBASE

@@ -1220,26 +1220,45 @@
       }
 
       let added = 0;
+      const savePromises = [];
+
       imported.forEach((entry) => {
         const normalized = normalizeImportedEntry(entry);
         if (!normalized.company || !normalized.role) {
           return;
         }
 
-        state.applications.unshift({
+        const newApp = {
           ...createBlankApplication(),
           ...normalized,
           id: generateId(),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
-        });
+        };
+
+        state.applications.unshift(newApp);
         added += 1;
+
+        // Save each imported app to Firebase
+        if (useFirebase && currentUserId) {
+          savePromises.push(
+            FirebaseAPI.db.saveApplication(currentUserId, newApp)
+              .catch((error) => {
+                console.error('Failed to save imported app to Firebase:', error);
+              })
+          );
+        }
       });
 
       if (added === 0) {
         showToast("No rows imported. Ensure columns include job link or company/title", "warning");
       } else {
-        saveApplications();
+        // Wait for all Firebase saves to complete
+        if (savePromises.length > 0) {
+          await Promise.all(savePromises);
+        } else {
+          saveApplications();
+        }
         renderUI();
         showToast(`Imported ${added} application(s)`);
       }
