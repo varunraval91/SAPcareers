@@ -5,6 +5,10 @@
  */
 
 (() => {
+  const DEFAULT_JOB_LINK = "https://jobs.sap.com/job/Walldorf-SAP-Corporate-Functions-&-Analytics-iXp-Intern-%28fmd%29-Corporate-Finance-Analytics-Team-69190/1367369733/";
+  const DEFAULT_JOB_COMPANY = "SAP";
+  const DEFAULT_JOB_ROLE = "SAP Corporate Functions & Analytics iXp Intern (fmd) - Corporate Finance Analytics Team";
+
   let currentUser = null;
   let unsubscribeListener = null;
   let initRetries = 0;
@@ -89,6 +93,12 @@
       }
 
       showAuthError('Cannot start personal workspace session', details);
+
+      // Hard fallback: keep app usable with localStorage instead of black screen.
+      showMainApp();
+      if (window.JobHuntApp && window.JobHuntApp.init) {
+        window.JobHuntApp.init(null, []);
+      }
     }
   }
 
@@ -252,6 +262,34 @@
     try {
       console.log('📦 Loading user data for:', userId);
       const applications = await FirebaseAPI.db.loadApplications(userId);
+
+      // Ensure requested SAP job exists once in personal workspace.
+      const hasDefaultJob = applications.some((item) => item.link === DEFAULT_JOB_LINK);
+      if (!hasDefaultJob) {
+        const seeded = {
+          id: (window.crypto && typeof window.crypto.randomUUID === 'function')
+            ? window.crypto.randomUUID()
+            : `seed_${Date.now()}`,
+          company: DEFAULT_JOB_COMPANY,
+          role: DEFAULT_JOB_ROLE,
+          link: DEFAULT_JOB_LINK,
+          postingDate: '',
+          stage: 'Applied',
+          appliedDate: '',
+          deadline: '',
+          followupDate: '',
+          contactType: '',
+          contactName: '',
+          contact: '',
+          notes: 'Seeded automatically from requested SAP role link.',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+
+        await FirebaseAPI.db.saveApplication(userId, seeded);
+        applications.unshift(seeded);
+        console.log('✅ Seeded default SAP job entry');
+      }
       
       // Initialize app with userId and applications
       if (window.JobHuntApp && window.JobHuntApp.init) {
@@ -272,6 +310,12 @@
 
     } catch (error) {
       console.error('❌ Failed to load user data:', error);
+
+      // Fallback to local UI instead of blank screen if cloud load fails.
+      showMainApp();
+      if (window.JobHuntApp && window.JobHuntApp.init) {
+        window.JobHuntApp.init(userId || null, []);
+      }
     }
   }
 
