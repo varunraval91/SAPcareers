@@ -102,64 +102,8 @@
       if (applications) {
         state.applications = applications;
       }
-      // On first load with empty data, seed initial jobs
-      if (state.applications.length === 0) {
-        seedInitialJobs();
-      }
       renderUI();
     }
-
-  function seedInitialJobs() {
-    const jobs = [
-      {
-        id: generateId(),
-        company: "Siemens",
-        role: "Working Student Global Communications And Operations Support Mfd",
-        link: "https://jobs.sw.siemens.com/nuremberg-deu/working-student-global-communications-and-operations-support-mfd/6245A7060F154B81B933729607783B05/job/",
-        location: "Nuremberg",
-        reqId: "6245A7060F154B81B933729607783B05",
-        postingDate: "",
-        stage: "Applied",
-        deadline: "",
-        contactType: "",
-        contactName: "",
-        contact: "",
-        notes: "",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      {
-        id: generateId(),
-        company: "SAP",
-        role: "SAP Corporate Functions & Analytics iXp Intern (fmd) - Corporate Finance Analytics Team",
-        link: "https://jobs.sap.com/job/Walldorf-SAP-Corporate-Functions-%26-Analytics-iXp-Intern-%28fmd%29-Corporate-Finance-Analytics-Team-69190/1367369733/",
-        location: "Walldorf",
-        reqId: "69190",
-        postingDate: "2026-02-24",
-        stage: "Applied",
-        deadline: "",
-        contactType: "",
-        contactName: "",
-        contact: "",
-        notes: "",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
-    ];
-
-    state.applications = jobs;
-
-    if (useFirebase && currentUserId) {
-      jobs.forEach(function(job) {
-        FirebaseAPI.db.saveApplication(currentUserId, job).catch(function(e) {
-          console.error("Seed save error:", e);
-        });
-      });
-    } else {
-      saveApplications();
-    }
-    console.log("✅ Seeded 2 initial jobs (Siemens + SAP)");
-  }
 
   function bindEvents() {
     addListener(DOM.themeToggle, "click", toggleTheme);

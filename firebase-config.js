@@ -61,7 +61,9 @@ function initializeFirebase() {
 // AUTHENTICATION HELPERS (ANONYMOUS PERSONAL MODE)
 // ═══════════════════════════════════════════════════════════════
 function signInAnonymously() {
-  return auth.signInAnonymously()
+  // Keep anonymous user session across refreshes in this browser.
+  return auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+    .then(() => auth.signInAnonymously())
     .then((result) => {
       console.log('✅ Signed in anonymously:', result.user.uid);
       return result.user;
@@ -100,9 +102,11 @@ async function saveApplicationToFirestore(userId, application) {
   try {
     const appRef = db.collection('users').doc(userId)
       .collection('applications').doc(application.id);
+    const nowIso = new Date().toISOString();
     
     await appRef.set({
       ...application,
+      createdAt: application.createdAt || nowIso,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
     
@@ -116,46 +120,77 @@ async function saveApplicationToFirestore(userId, application) {
 
 // Load all applications
 async function loadApplicationsFromFirestore(userId) {
+  const mapDoc = (doc) => ({
+    id: doc.id,
+    ...doc.data(),
+    createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
+    updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || doc.data().updatedAt
+  });
+
+  const baseRef = db.collection('users').doc(userId).collection('applications');
+
   try {
-    const snapshot = await db.collection('users').doc(userId)
-      .collection('applications')
-      .orderBy('createdAt', 'desc')
-      .get();
+    const snapshot = await baseRef.orderBy('updatedAt', 'desc').get();
     
-    const applications = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
-      updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || doc.data().updatedAt
-    }));
+    const applications = snapshot.docs.map(mapDoc);
     
     console.log(`✅ Loaded ${applications.length} applications`);
     return applications;
   } catch (error) {
-    console.error('Load error:', error);
-    return [];
+    console.warn('Ordered load failed, falling back to unordered load:', error.code || error.message);
+    try {
+      const fallbackSnapshot = await baseRef.get();
+      const applications = fallbackSnapshot.docs.map(mapDoc)
+        .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
+      console.log(`✅ Loaded ${applications.length} applications (fallback)`);
+      return applications;
+    } catch (fallbackError) {
+      console.error('Fallback load error:', fallbackError);
+      return [];
+    }
   }
 }
 
 // Real-time listener for applications
 function listenToApplications(userId, callback) {
-  return db.collection('users').doc(userId)
-    .collection('applications')
-    .orderBy('createdAt', 'desc')
+  const mapDoc = (doc) => ({
+    id: doc.id,
+    ...doc.data(),
+    createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
+    updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || doc.data().updatedAt
+  });
+
+  const baseRef = db.collection('users').doc(userId).collection('applications');
+  const onSnapshotData = (snapshot) => {
+    const applications = snapshot.docs.map(mapDoc)
+      .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
+    callback(applications);
+  };
+
+  let fallbackUnsubscribe = null;
+  const primaryUnsubscribe = baseRef
+    .orderBy('updatedAt', 'desc')
     .onSnapshot(
-      (snapshot) => {
-        const applications = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
-          updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || doc.data().updatedAt
-        }));
-        callback(applications);
-      },
+      onSnapshotData,
       (error) => {
-        console.error('Listener error:', error);
+        console.warn('Ordered listener failed, switching to fallback listener:', error.code || error.message);
+        if (!fallbackUnsubscribe) {
+          fallbackUnsubscribe = baseRef.onSnapshot(
+            onSnapshotData,
+            (fallbackError) => {
+              console.error('Fallback listener error:', fallbackError);
+            }
+          );
+        }
       }
     );
+
+  return () => {
+    primaryUnsubscribe();
+    if (fallbackUnsubscribe) {
+      fallbackUnsubscribe();
+    }
+  };
 }
 
 // Delete application
