@@ -252,10 +252,11 @@
       }
 
       if (current.isAnonymous) {
-        await FirebaseAPI.auth.linkAnonymousToEmail(email, password);
-        showToast("Account linked. Use this email on all devices.");
+        await FirebaseAPI.auth.upgradeAnonymousToEmail(email, password);
+        showToast("Account upgraded! Use this email on all devices.");
+        // Data will sync automatically via onAuthStateChanged
       } else {
-        // Already linked account: sign in on this device to ensure credentials are valid.
+        // Already permanent account: just verify credentials
         await FirebaseAPI.auth.signInWithEmail(email, password);
         showToast("Email account already active.");
       }

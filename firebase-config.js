@@ -110,25 +110,58 @@ function createUserWithEmail(email, password) {
     });
 }
 
-function linkAnonymousToEmail(email, password) {
-  const user = auth.currentUser;
-  if (!user) {
-    return Promise.reject(new Error('No active user to link. Sign in anonymously first.'));
+async function upgradeAnonymousToEmail(email, password) {
+  const anonymousUser = auth.currentUser;
+  if (!anonymousUser) {
+    throw new Error('No active user. Sign in anonymously first.');
   }
-  if (!user.isAnonymous) {
-    return Promise.resolve(user);
+  if (!anonymousUser.isAnonymous) {
+    return anonymousUser; // Already permanent account
   }
 
-  const credential = firebase.auth.EmailAuthProvider.credential(email, password);
-  return user.linkWithCredential(credential)
-    .then((result) => {
-      console.log('✅ Anonymous account linked to email:', result.user.uid);
-      return result.user;
-    })
-    .catch((error) => {
-      console.error('Anonymous link error:', error);
-      throw error;
+  const anonymousUid = anonymousUser.uid;
+  console.log('🔄 Migrating data from anonymous account:', anonymousUid);
+
+  try {
+    // Step 1: Fetch all data from anonymous user
+    const snapshot = await db.collection('users').doc(anonymousUid)
+      .collection('applications').get();
+    const applications = [];
+    snapshot.forEach(doc => applications.push({ id: doc.id, ...doc.data() }));
+    console.log(`📦 Found ${applications.length} applications to migrate`);
+
+    // Step 2: Create new email/password account
+    const credential = await auth.createUserWithEmailAndPassword(email, password);
+    const newUser = credential.user;
+    const newUid = newUser.uid;
+    console.log('✅ New email account created:', newUid);
+
+    // Step 3: Copy all applications to new user
+    const batch = db.batch();
+    applications.forEach(app => {
+      const newRef = db.collection('users').doc(newUid)
+        .collection('applications').doc(app.id);
+      batch.set(newRef, app);
     });
+    await batch.commit();
+    console.log(`✅ Migrated ${applications.length} applications to new account`);
+
+    // Step 4: Delete old anonymous data (optional cleanup)
+    try {
+      const deletePromises = [];
+      snapshot.forEach(doc => deletePromises.push(doc.ref.delete()));
+      await Promise.all(deletePromises);
+      await anonymousUser.delete();
+      console.log('🗑️ Cleaned up old anonymous account');
+    } catch (cleanupError) {
+      console.warn('Cleanup warning (non-critical):', cleanupError);
+    }
+
+    return newUser;
+  } catch (error) {
+    console.error('Migration error:', error);
+    throw error;
+  }
 }
 
 function getCurrentUser() {
@@ -294,7 +327,7 @@ window.FirebaseAPI = {
     signInAnonymously,
     signInWithEmail,
     createUserWithEmail,
-    linkAnonymousToEmail,
+    upgradeAnonymousToEmail,
     signOut,
     getCurrentUser,
     onAuthStateChanged
