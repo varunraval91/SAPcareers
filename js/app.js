@@ -2,12 +2,27 @@
   const STORAGE_KEY = "job_hunt_hq_applications";
   const GOAL_KEY = "job_hunt_hq_weekly_goal";
   const THEME_KEY = "job_hunt_hq_theme";
+  const ANALYTICS_KEY = "job_hunt_hq_analytics_open";
 
   const STAGES = ["Wishlist", "Applied", "OA/Test", "Interview", "Rejected", "Offer"];
 
     // Firebase state
     let currentUserId = null;
     let useFirebase = false;
+
+  const charts = {
+    regression: null,
+    stage: null,
+    company: null,
+    trends: null
+  };
+
+  const quoteState = {
+    selectedQuote: "",
+    typingTimer: null,
+    canReplayOnScroll: true,
+    observer: null
+  };
 
     // Check if Firebase is available and ready
     function checkFirebase() {
@@ -46,7 +61,8 @@
     currentSort: "deadline-asc",
     searchQuery: "",
     editingId: null,
-    theme: safeStorageGet(THEME_KEY) || "light"
+    theme: safeStorageGet(THEME_KEY) || "light",
+    analyticsExpanded: safeStorageGet(ANALYTICS_KEY) !== "false"
   };
 
   const DOM = {
@@ -65,19 +81,27 @@
     goalBarFill: document.getElementById("goal-bar-fill"),
     goalText: document.getElementById("goal-text"),
     goalEditBtn: document.getElementById("goal-edit-btn"),
+    analyticsToggleBtn: document.getElementById("analytics-toggle-btn"),
+    analyticsNavBtn: document.getElementById("analytics-nav-btn"),
+    analyticsPanel: document.getElementById("analytics-panel"),
+    analyticsMetricSelect: document.getElementById("analytics-metric-select"),
+    analyticsRegressionCanvas: document.getElementById("analytics-regression-chart"),
+    analyticsStageCanvas: document.getElementById("analytics-stage-chart"),
+    analyticsCompanyCanvas: document.getElementById("analytics-company-chart"),
+    analyticsTrendsCanvas: document.getElementById("analytics-trends-chart"),
     statTotal: document.getElementById("stat-total"),
     statApplied: document.getElementById("stat-applied"),
     statInterview: document.getElementById("stat-interview"),
     statOffers: document.getElementById("stat-offers"),
     statFollowup: document.getElementById("stat-followup"),
     statResponse: document.getElementById("stat-response"),
-    stageDistribution: document.getElementById("stage-distribution"),
     searchInput: document.getElementById("search-input"),
     sortSelect: document.getElementById("sort-select"),
     activeFilterBar: document.getElementById("active-filter-bar"),
     activeFilterLabel: document.getElementById("active-filter-label"),
     clearFilterBtn: document.getElementById("clear-filter-btn"),
-    kanbanBoard: document.getElementById("kanban-board")
+    kanbanBoard: document.getElementById("kanban-board"),
+    scrollToTopBtn: document.getElementById("scroll-to-top-btn")
   };
 
   // Fallback hook used by the inline button handler in index.html.
@@ -99,6 +123,7 @@
         : null;
       updateAccountStatusUI(currentUser);
       renderUI();
+      loadMotivationalQuote();
   }
 
     // Called by auth.js after user signs in
@@ -117,6 +142,24 @@
   function bindEvents() {
     addListener(DOM.themeToggle, "click", toggleTheme);
     addListener(DOM.accountLogoutBtn, "click", handleLogout);
+    addListener(DOM.analyticsToggleBtn, "click", () => toggleAnalytics());
+    addListener(DOM.analyticsMetricSelect, "change", renderAnalytics);
+    addListener(DOM.analyticsNavBtn, "click", (event) => {
+      event.preventDefault();
+      toggleAnalytics();
+    });
+    
+    // Dashboard navigation
+    document.querySelectorAll('.nav-item[data-view="dashboard"]').forEach(btn => {
+      addListener(btn, "click", (event) => {
+        event.preventDefault();
+        if (state.analyticsExpanded) {
+          toggleAnalytics(false);
+        }
+        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
     addListener(DOM.importBtn, "click", () => {
       if (DOM.importFileInput) {
         DOM.importFileInput.click();
@@ -160,6 +203,16 @@
       renderKanban();
     });
 
+    // Scroll to top button handlers
+    if (DOM.scrollToTopBtn) {
+      addListener(DOM.scrollToTopBtn, "click", scrollToTop);
+    }
+    
+    const mainContent = document.querySelector('.main-content');
+    if (mainContent) {
+      addListener(mainContent, "scroll", handleScrollVisibility);
+    }
+
     document.querySelectorAll(".chip").forEach((chip) => {
       chip.addEventListener("click", () => {
         state.currentFilter = chip.dataset.stage;
@@ -197,6 +250,27 @@
       return;
     }
     element.addEventListener(eventName, handler);
+  }
+
+  function handleScrollVisibility() {
+    const mainContent = document.querySelector('.main-content');
+    if (mainContent && DOM.scrollToTopBtn) {
+      if (mainContent.scrollTop > 400) {
+        DOM.scrollToTopBtn.classList.remove('hidden');
+      } else {
+        DOM.scrollToTopBtn.classList.add('hidden');
+      }
+    }
+  }
+
+  function scrollToTop() {
+    const mainContent = document.querySelector('.main-content');
+    if (mainContent) {
+      mainContent.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }
   }
 
   function setupTheme() {
@@ -248,9 +322,638 @@
   function renderUI() {
     renderStats();
     renderGoal();
-    renderStageDistribution();
     renderFilterUI();
     renderKanban();
+    syncAnalyticsPanelUI();
+    renderAnalytics();
+  }
+
+  function toggleAnalytics(forceValue) {
+    state.analyticsExpanded = typeof forceValue === "boolean" ? forceValue : !state.analyticsExpanded;
+    safeStorageSet(ANALYTICS_KEY, state.analyticsExpanded ? "true" : "false");
+    syncAnalyticsPanelUI();
+    renderAnalytics();
+  }
+
+  function syncAnalyticsPanelUI() {
+    if (DOM.analyticsPanel) {
+      DOM.analyticsPanel.classList.toggle("hidden", !state.analyticsExpanded);
+    }
+
+    if (DOM.analyticsToggleBtn) {
+      DOM.analyticsToggleBtn.textContent = state.analyticsExpanded ? "▴" : "📈";
+      DOM.analyticsToggleBtn.setAttribute("aria-label", state.analyticsExpanded ? "Hide analytics" : "Show analytics");
+    }
+
+    if (DOM.analyticsNavBtn) {
+      DOM.analyticsNavBtn.classList.toggle("active", state.analyticsExpanded);
+    }
+
+    // Sync dashboard nav button
+    const dashboardNavBtns = document.querySelectorAll('.nav-item[data-view="dashboard"]');
+    dashboardNavBtns.forEach(btn => {
+      btn.classList.toggle("active", !state.analyticsExpanded);
+    });
+  }
+
+  function renderAnalytics() {
+    if (!state.analyticsExpanded) {
+      return;
+    }
+
+    if (typeof Chart === "undefined") {
+      showToast("Analytics library not loaded", "warning");
+      return;
+    }
+
+    renderRegressionChart();
+    renderStageChart();
+    renderCompanyStackedChart();
+    renderTrendsChart();
+  }
+
+  function renderRegressionChart() {
+    if (!DOM.analyticsRegressionCanvas) {
+      return;
+    }
+
+    const metric = DOM.analyticsMetricSelect ? DOM.analyticsMetricSelect.value : "stage";
+    let labels = [];
+    let values = [];
+
+    if (metric === "company") {
+      const companyMap = new Map();
+      state.applications.forEach((app) => {
+        const name = (app.company || "Unknown").trim() || "Unknown";
+        companyMap.set(name, (companyMap.get(name) || 0) + 1);
+      });
+
+      const topCompanies = Array.from(companyMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8);
+
+      labels = topCompanies.map((entry) => entry[0]);
+      values = topCompanies.map((entry) => entry[1]);
+    } else {
+      labels = STAGES;
+      values = STAGES.map((stage) => state.applications.filter((app) => app.stage === stage).length);
+    }
+
+    const trend = computeRegressionLine(values);
+
+    if (charts.regression) {
+      charts.regression.destroy();
+    }
+
+    // Create gradient for bars
+    const ctx = DOM.analyticsRegressionCanvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, 'rgba(99, 102, 241, 0.85)');
+    gradient.addColorStop(1, 'rgba(99, 102, 241, 0.35)');
+
+    charts.regression = new Chart(DOM.analyticsRegressionCanvas, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: metric === "company" ? "Applications" : "Job status count",
+            data: values,
+            backgroundColor: gradient,
+            borderRadius: 8,
+            barPercentage: 0.75,
+            categoryPercentage: 0.85
+          },
+          {
+            type: "line",
+            label: "Trend Line",
+            data: trend,
+            borderColor: "#ef4444",
+            borderWidth: 2.5,
+            pointRadius: 0,
+            tension: 0.3,
+            borderDash: [5, 5]
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false
+        },
+        plugins: {
+          legend: { 
+            position: "top",
+            labels: {
+              usePointStyle: true,
+              padding: 15,
+              font: { size: 12, weight: '500' }
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            padding: 12,
+            titleFont: { size: 13, weight: 'bold' },
+            bodyFont: { size: 12 },
+            cornerRadius: 8,
+            displayColors: true,
+            callbacks: {
+              title: function(context) {
+                return context[0].label;
+              },
+              label: function(context) {
+                if (context.datasetIndex === 0) {
+                  const count = context.parsed.y;
+                  return ` ${count} application${count !== 1 ? 's' : ''}`;
+                }
+                return ` Trend: ${context.parsed.y.toFixed(1)}`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { 
+              font: { size: 11 },
+              maxRotation: 45,
+              minRotation: 0
+            }
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { 
+              precision: 0,
+              font: { size: 11 }
+            },
+            grid: {
+              color: 'rgba(0, 0, 0, 0.05)'
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function renderStageChart() {
+    if (!DOM.analyticsStageCanvas) {
+      return;
+    }
+
+    const values = STAGES.map((stage) => state.applications.filter((app) => app.stage === stage).length);
+    const total = values.reduce((sum, val) => sum + val, 0);
+
+    if (charts.stage) {
+      charts.stage.destroy();
+    }
+
+    // Vibrant cohesive color palette with 3D depth
+    const colors = [
+      "#8b5cf6",  // Wishlist - purple
+      "#6366f1",  // Applied - indigo
+      "#f59e0b",  // OA/Test - amber
+      "#06b6d4",  // Interview - cyan
+      "#ef4444",  // Rejected - red
+      "#10b981"   // Offer - green
+    ];
+
+    const hoverColors = [
+      "#7c3aed",
+      "#4f46e5",
+      "#d97706",
+      "#0891b2",
+      "#dc2626",
+      "#059669"
+    ];
+
+    charts.stage = new Chart(DOM.analyticsStageCanvas, {
+      type: "doughnut",
+      data: {
+        labels: STAGES,
+        datasets: [
+          {
+            data: values,
+            backgroundColor: colors,
+            hoverBackgroundColor: hoverColors,
+            borderWidth: 4,
+            borderColor: '#ffffff',
+            hoverOffset: 15,
+            hoverBorderWidth: 4,
+            spacing: 2
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '68%',
+        plugins: {
+          legend: { 
+            position: "bottom",
+            labels: {
+              usePointStyle: true,
+              pointStyle: 'circle',
+              padding: 15,
+              font: { size: 11, weight: '600' },
+              generateLabels: function(chart) {
+                const data = chart.data;
+                if (data.labels.length && data.datasets.length) {
+                  return data.labels.map((label, i) => {
+                    const value = data.datasets[0].data[i];
+                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                    return {
+                      text: `${label}: ${value} (${percentage}%)`,
+                      fillStyle: data.datasets[0].backgroundColor[i],
+                      hidden: false,
+                      index: i
+                    };
+                  });
+                }
+                return [];
+              }
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            padding: 14,
+            cornerRadius: 10,
+            titleFont: { size: 14, weight: 'bold' },
+            bodyFont: { size: 13 },
+            borderColor: 'rgba(255, 255, 255, 0.1)',
+            borderWidth: 1,
+            callbacks: {
+              label: function(context) {
+                const value = context.parsed;
+                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                return ` ${value} applications (${percentage}%)`;
+              }
+            }
+          }
+        },
+        animation: {
+          animateRotate: true,
+          animateScale: true,
+          duration: 1000,
+          easing: 'easeInOutQuart'
+        }
+      },
+      plugins: [{
+        id: 'centerText',
+        beforeDraw: function(chart) {
+          if (chart.config.type === 'doughnut') {
+            const ctx = chart.ctx;
+            const centerX = (chart.chartArea.left + chart.chartArea.right) / 2;
+            const centerY = (chart.chartArea.top + chart.chartArea.bottom) / 2;
+            
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // Draw total number with shadow for depth
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
+            ctx.shadowBlur = 8;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 2;
+            ctx.font = 'bold 32px system-ui, -apple-system, sans-serif';
+            ctx.fillStyle = '#1f2937';
+            ctx.fillText(total, centerX, centerY - 10);
+            
+            // Draw label
+            ctx.shadowBlur = 0;
+            ctx.font = '600 13px system-ui, -apple-system, sans-serif';
+            ctx.fillStyle = '#6b7280';
+            ctx.fillText('TOTAL APPS', centerX, centerY + 18);
+            ctx.restore();
+          }
+        }
+      }]
+    });
+  }
+
+  function renderCompanyStackedChart() {
+    if (!DOM.analyticsCompanyCanvas) {
+      return;
+    }
+
+    // Get top companies by application count
+    const companyMap = new Map();
+    state.applications.forEach((app) => {
+      const company = (app.company || "Other").trim() || "Other";
+      if (!companyMap.has(company)) {
+        companyMap.set(company, {});
+      }
+      const stage = app.stage || "Wishlist";
+      const companyData = companyMap.get(company);
+      companyData[stage] = (companyData[stage] || 0) + 1;
+    });
+
+    // Get top 8 companies by total applications
+    const sortedCompanies = Array.from(companyMap.entries())
+      .map(([company, stageData]) => {
+        const total = Object.values(stageData).reduce((sum, count) => sum + count, 0);
+        return { company, stageData, total };
+      })
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 8);
+
+    const labels = sortedCompanies.map(item => item.company);
+    
+    // Create datasets for each stage
+    const stageColors = {
+      "Wishlist": "#8b5cf6",
+      "Applied": "#6366f1",
+      "OA/Test": "#f59e0b",
+      "Interview": "#06b6d4",
+      "Rejected": "#ef4444",
+      "Offer": "#10b981"
+    };
+
+    const datasets = STAGES.map(stage => ({
+      label: stage,
+      data: sortedCompanies.map(item => item.stageData[stage] || 0),
+      backgroundColor: stageColors[stage],
+      borderRadius: 4,
+      borderSkipped: false
+    }));
+
+    if (charts.company) {
+      charts.company.destroy();
+    }
+
+    charts.company = new Chart(DOM.analyticsCompanyCanvas, {
+      type: "bar",
+      data: {
+        labels,
+        datasets
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false
+        },
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: {
+              usePointStyle: true,
+              pointStyle: 'circle',
+              padding: 12,
+              font: { size: 11, weight: '600' }
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            padding: 14,
+            cornerRadius: 10,
+            titleFont: { size: 13, weight: 'bold' },
+            bodyFont: { size: 12 },
+            borderColor: 'rgba(255, 255, 255, 0.1)',
+            borderWidth: 1,
+            callbacks: {
+              footer: function(tooltipItems) {
+                const total = tooltipItems.reduce((sum, item) => sum + item.parsed.y, 0);
+                return `\nTotal: ${total} applications`;
+              }
+            },
+            footerFont: { size: 12, weight: 'bold' },
+            footerColor: '#ffffff'
+          }
+        },
+        scales: {
+          x: {
+            stacked: true,
+            grid: { display: false },
+            ticks: {
+              font: { size: 11, weight: '500' },
+              maxRotation: 45,
+              minRotation: 0
+            }
+          },
+          y: {
+            stacked: true,
+            beginAtZero: true,
+            ticks: {
+              precision: 0,
+              font: { size: 11 }
+            },
+            grid: {
+              color: 'rgba(0, 0, 0, 0.05)'
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function renderTrendsChart() {
+    if (!DOM.analyticsTrendsCanvas) {
+      return;
+    }
+
+    // Calculate success rate trends over the last 8 weeks
+    const labels = [];
+    const successRates = [];
+    const appliedCounts = [];
+    const interviewCounts = [];
+    const now = new Date();
+
+    for (let i = 7; i >= 0; i -= 1) {
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - (i * 7));
+      weekStart.setHours(0, 0, 0, 0);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+
+      const weekApps = state.applications.filter((app) => {
+        if (!app.createdAt) return false;
+        const created = new Date(app.createdAt);
+        return created >= weekStart && created <= weekEnd;
+      });
+
+      const applied = weekApps.filter(app => app.stage === "Applied").length;
+      const interviewed = weekApps.filter(app => 
+        app.stage === "Interview" || app.stage === "Offer"
+      ).length;
+      const successRate = applied > 0 ? ((interviewed / applied) * 100) : 0;
+
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      labels.push(`${monthNames[weekStart.getMonth()]} ${weekStart.getDate()}`);
+      successRates.push(successRate);
+      appliedCounts.push(applied);
+      interviewCounts.push(interviewed);
+    }
+
+    if (charts.trends) {
+      charts.trends.destroy();
+    }
+
+    // Create gradients
+    const ctx = DOM.analyticsTrendsCanvas.getContext('2d');
+    
+    const successGradient = ctx.createLinearGradient(0, 0, 0, 300);
+    successGradient.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
+    successGradient.addColorStop(0.7, 'rgba(16, 185, 129, 0.1)');
+    successGradient.addColorStop(1, 'rgba(16, 185, 129, 0.01)');
+
+    const appliedGradient = ctx.createLinearGradient(0, 0, 0, 300);
+    appliedGradient.addColorStop(0, 'rgba(99, 102, 241, 0.25)');
+    appliedGradient.addColorStop(1, 'rgba(99, 102, 241, 0.01)');
+
+    charts.trends = new Chart(DOM.analyticsTrendsCanvas, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Success Rate (%)",
+            data: successRates,
+            borderColor: "#10b981",
+            backgroundColor: successGradient,
+            fill: true,
+            tension: 0.45,
+            borderWidth: 3,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+            pointBackgroundColor: "#10b981",
+            pointBorderColor: "#ffffff",
+            pointBorderWidth: 2,
+            pointHoverBorderWidth: 3,
+            yAxisID: 'y'
+          },
+          {
+            label: "Applications",
+            data: appliedCounts,
+            borderColor: "#6366f1",
+            backgroundColor: appliedGradient,
+            fill: true,
+            tension: 0.45,
+            borderWidth: 2.5,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            pointBackgroundColor: "#6366f1",
+            pointBorderColor: "#ffffff",
+            pointBorderWidth: 2,
+            pointHoverBorderWidth: 3,
+            yAxisID: 'y1'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              usePointStyle: true,
+              pointStyle: 'circle',
+              padding: 15,
+              font: { size: 12, weight: '600' }
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            padding: 14,
+            cornerRadius: 10,
+            titleFont: { size: 13, weight: 'bold' },
+            bodyFont: { size: 12 },
+            borderColor: 'rgba(255, 255, 255, 0.1)',
+            borderWidth: 1,
+            callbacks: {
+              label: function(context) {
+                if (context.datasetIndex === 0) {
+                  return ` Success Rate: ${context.parsed.y.toFixed(1)}%`;
+                } else {
+                  return ` Applications: ${context.parsed.y}`;
+                }
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: {
+              font: { size: 11 },
+              maxRotation: 45,
+              minRotation: 0
+            }
+          },
+          y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            beginAtZero: true,
+            max: 100,
+            ticks: {
+              callback: function(value) {
+                return value + '%';
+              },
+              font: { size: 11 }
+            },
+            grid: {
+              color: 'rgba(16, 185, 129, 0.1)'
+            },
+            title: {
+              display: true,
+              text: 'Success Rate',
+              font: { size: 11, weight: '600' },
+              color: '#10b981'
+            }
+          },
+          y1: {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            beginAtZero: true,
+            ticks: {
+              precision: 0,
+              font: { size: 11 }
+            },
+            grid: {
+              drawOnChartArea: false
+            },
+            title: {
+              display: true,
+              text: 'Applications',
+              font: { size: 11, weight: '600' },
+              color: '#6366f1'
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function computeRegressionLine(values) {
+    if (!values.length) {
+      return [];
+    }
+
+    const n = values.length;
+    const sumX = values.reduce((acc, _, idx) => acc + idx, 0);
+    const sumY = values.reduce((acc, val) => acc + val, 0);
+    const sumXY = values.reduce((acc, val, idx) => acc + (idx * val), 0);
+    const sumXX = values.reduce((acc, _, idx) => acc + (idx * idx), 0);
+    const denominator = (n * sumXX) - (sumX * sumX);
+
+    if (denominator === 0) {
+      return [...values];
+    }
+
+    const slope = ((n * sumXY) - (sumX * sumY)) / denominator;
+    const intercept = (sumY - (slope * sumX)) / n;
+    return values.map((_, idx) => Math.max(0, Number((intercept + (slope * idx)).toFixed(2))));
   }
 
   function openModal(editId = null) {
@@ -1046,6 +1749,77 @@
     renderUI();
   }
 
+  function loadMotivationalQuote() {
+    const quotes = [
+      "Every rejection is redirection. Keep applying, your breakthrough is coming.",
+      "The job hunt is a marathon, not a sprint. Persistence always wins.",
+      "Your dream role is out there. Every application brings you one step closer.",
+      "Success is the sum of small efforts repeated day after day. Keep going!",
+      "Today's 'no' is tomorrow's 'yes'. Don't stop when you're tired, stop when you're done.",
+      "The only way to guarantee failure is to stop trying. Your next application could be the one.",
+      "Hard work beats talent when talent doesn't work hard. Stay consistent."
+    ];
+
+    const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+    const container = document.getElementById('motivational-quote-container');
+    if (!container) return;
+
+    quoteState.selectedQuote = randomQuote;
+    runQuoteTypewriter();
+    setupQuoteScrollAnimation();
+  }
+
+  function runQuoteTypewriter() {
+    const container = document.getElementById('motivational-quote-container');
+    if (!container || !quoteState.selectedQuote) return;
+
+    if (quoteState.typingTimer) {
+      clearInterval(quoteState.typingTimer);
+      quoteState.typingTimer = null;
+    }
+
+    container.textContent = "";
+    container.classList.add("is-typing");
+
+    let index = 0;
+    quoteState.typingTimer = setInterval(() => {
+      index += 1;
+      container.textContent = quoteState.selectedQuote.slice(0, index);
+
+      if (index >= quoteState.selectedQuote.length) {
+        clearInterval(quoteState.typingTimer);
+        quoteState.typingTimer = null;
+        container.classList.remove("is-typing");
+      }
+    }, 38);
+  }
+
+  function setupQuoteScrollAnimation() {
+    const quoteSection = document.querySelector('.quote-banner');
+    if (!quoteSection) return;
+
+    if (quoteState.observer) {
+      quoteState.observer.disconnect();
+    }
+
+    quoteState.observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting && quoteState.canReplayOnScroll) {
+          runQuoteTypewriter();
+          quoteState.canReplayOnScroll = false;
+        }
+
+        if (!entry.isIntersecting) {
+          quoteState.canReplayOnScroll = true;
+        }
+      });
+    }, {
+      threshold: 0.45
+    });
+
+    quoteState.observer.observe(quoteSection);
+  }
+
   function renderStats() {
     const apps = state.applications;
     const applied = apps.filter((a) => a.stage === "Applied").length;
@@ -1069,33 +1843,6 @@
     const percentage = Math.min(100, (thisWeekCount / state.currentWeeklyGoal) * 100);
     DOM.goalBarFill.style.width = `${percentage}%`;
     DOM.goalText.textContent = `${thisWeekCount} / ${state.currentWeeklyGoal} applications this week`;
-  }
-
-  function renderStageDistribution() {
-    const total = state.applications.length;
-    const stageColors = {
-      Wishlist: "var(--stage-wishlist)",
-      Applied: "var(--stage-applied)",
-      "OA/Test": "var(--stage-oa)",
-      Interview: "var(--stage-interview)",
-      Rejected: "var(--stage-rejected)",
-      Offer: "var(--stage-offer)"
-    };
-
-    if (total === 0) {
-      DOM.stageDistribution.innerHTML = "<div class=\"stage-segment\" style=\"background:var(--urgent-none)\"></div>";
-      return;
-    }
-
-    DOM.stageDistribution.innerHTML = STAGES
-      .map((stage) => {
-        const count = state.applications.filter((a) => a.stage === stage).length;
-        if (!count) {
-          return "";
-        }
-        return `<div class="stage-segment" style="flex:${count};background:${stageColors[stage]}" title="${stage}: ${count}"></div>`;
-      })
-      .join("");
   }
 
   function renderFilterUI() {
@@ -1152,13 +1899,11 @@
     card.dataset.appId = app.id;
 
     const deadlineText = app.deadline ? formatDate(app.deadline) : "-";
-    const companyInitial = String(app.company || "?").trim().charAt(0).toUpperCase() || "?";
     const stageSlug = String(app.stage || "applied").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
 
     card.innerHTML = `
       <div class="card-head-row">
         <div class="card-brand">
-          <div class="company-avatar">${escapeHtml(companyInitial)}</div>
           <div>
             <p class="card-company">${escapeHtml(app.company || "Unknown Company")}</p>
             <p class="card-location">${escapeHtml(app.location || "No location")}</p>

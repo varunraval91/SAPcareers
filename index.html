@@ -6,7 +6,7 @@
   <title>Job and Internship Application Tracking Pipeline</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Style+Script&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/redesign.css" />
   <link rel="stylesheet" href="css/auth-screen-styles.css" />
@@ -22,7 +22,37 @@
       <div class="auth-card">
         <div class="auth-header">
           <div class="auth-logo">
-            <div class="auth-logo-icon">JP</div>
+            <svg class="auth-logo-icon" viewBox="0 0 120 140" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="authLogoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style="stop-color:#6C5CE7;stop-opacity:1" />
+                  <stop offset="100%" style="stop-color:#00B894;stop-opacity:1" />
+                </linearGradient>
+                <linearGradient id="authFrameGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" style="stop-color:#00B894;stop-opacity:0.8" />
+                  <stop offset="100%" style="stop-color:#00B894;stop-opacity:0.2" />
+                </linearGradient>
+              </defs>
+              <!-- Decorative arc frame -->
+              <path d="M 60,15 A 45,45 0 1,1 50,103" fill="none" stroke="url(#authFrameGradient)" stroke-width="2" stroke-linecap="round" stroke-dasharray="1,2.5" />
+              <!-- Briefcase -->
+              <rect x="45" y="65" width="30" height="18" rx="2" fill="#6C5CE7" />
+              <path d="M 54,65 L 54,61 Q 60,58 66,61 L 66,65" fill="none" stroke="#6C5CE7" stroke-width="1.5" />
+              <rect x="58" y="72" width="4" height="2" rx="0.5" fill="#FFFFFF" opacity="0.5" />
+              <!-- Upward Arrow -->
+              <path d="M 60,25 L 75,45 L 65,45 L 65,65 L 55,65 L 55,45 L 45,45 Z" fill="url(#authLogoGradient)" />
+              <path d="M 60,28 L 62,33 L 62,40 L 58,40 L 58,33 Z" fill="#FFFFFF" opacity="0.8" />
+              <!-- Pin marker -->
+              <circle cx="50" cy="48" r="1.5" fill="#00B894" />
+              <path d="M 50,51 L 49,49 L 51,49 Z" fill="#00B894" />
+              <!-- Document -->
+              <rect x="68" y="47" width="3" height="4" fill="#FFFFFF" />
+              <line x1="68.5" y1="48" x2="70.5" y2="48" stroke="#6C5CE7" stroke-width="0.3" />
+              <line x1="68.5" y1="49" x2="70.5" y2="49" stroke="#6C5CE7" stroke-width="0.3" />
+              <!-- Text -->
+              <text x="60" y="100" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#2D3436" text-anchor="middle" letter-spacing="0.5">JOB TRACKER</text>
+              <text x="60" y="110" font-family="Arial, sans-serif" font-size="4.5" fill="#00B894" text-anchor="middle" letter-spacing="1.2">APPLICATION PIPELINE</text>
+            </svg>
           </div>
           <h1 class="auth-title">Job and Internship Application Tracking Pipeline</h1>
           <p class="auth-subtitle">Sign in to access your dashboard, KPI cards, and kanban board.</p>
@@ -64,6 +94,13 @@
   </div>
 
   <!-- ═══════════════════════════════════════ -->
+  <!-- SCROLL TO TOP BUTTON                    -->
+  <!-- ═══════════════════════════════════════ -->
+  <button id="scroll-to-top-btn" class="scroll-to-top-btn hidden" aria-label="Scroll to top" title="Back to top">
+    ↑
+  </button>
+
+  <!-- ═══════════════════════════════════════ -->
   <!-- MAIN LAYOUT                             -->
   <!-- ═══════════════════════════════════════ -->
   <div class="app-layout hidden" id="app-layout">
@@ -71,12 +108,28 @@
     <!-- SIDEBAR (desktop only) -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-logo">
-        <span class="logo-mark">JI</span>
-        <span class="logo-text">Job and Internship Tracking</span>
+        <svg class="logo-icon" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#6C5CE7;stop-opacity:1" />
+              <stop offset="100%" style="stop-color:#00B894;stop-opacity:1" />
+            </linearGradient>
+          </defs>
+          <!-- Briefcase -->
+          <rect x="35" y="65" width="50" height="30" rx="4" fill="#6C5CE7" />
+          <path d="M 48,65 L 48,58 Q 60,52 72,58 L 72,65" fill="none" stroke="#6C5CE7" stroke-width="3" />
+          <rect x="55" y="72" width="10" height="5" rx="2" fill="#FFFFFF" opacity="0.6" />
+          <!-- Upward Arrow -->
+          <path d="M 60,25 L 80,45 L 70,45 L 70,65 L 50,65 L 50,45 L 40,45 Z" fill="url(#logoGradient)" />
+          <path d="M 60,28 L 63,35 L 63,45 L 57,45 L 57,35 Z" fill="#FFFFFF" opacity="0.8" />
+        </svg>
       </div>
       <nav class="sidebar-nav">
         <a href="#" class="nav-item active" data-view="dashboard" title="Dashboard">
           <span class="nav-icon">▦</span> <span class="nav-label">Dashboard</span>
+        </a>
+        <a href="#" class="nav-item" data-view="analytics" id="analytics-nav-btn" title="Analytics">
+          <span class="nav-icon">◍</span> <span class="nav-label">Analytics</span>
         </a>
       </nav>
       <div class="sidebar-footer">
@@ -118,99 +171,137 @@
         <div class="goal-widget">
           <div class="goal-label">
             <span>Weekly Goal</span>
-            <button class="goal-edit-btn" id="goal-edit-btn" aria-label="Edit weekly goal">✎</button>
+            <div class="goal-tools">
+              <button class="goal-edit-btn" id="goal-edit-btn" aria-label="Edit weekly goal">✎</button>
+              <button class="analytics-toggle-btn" id="analytics-toggle-btn" aria-label="Toggle analytics" title="Toggle analytics">📈</button>
+            </div>
           </div>
-          <div class="goal-bar-track">
-            <div class="goal-bar-fill" id="goal-bar-fill"></div>
+          <div class="goal-progress-container">
+            <div class="goal-bar-track">
+              <div class="goal-bar-fill" id="goal-bar-fill"></div>
+            </div>
+            <div class="goal-text" id="goal-text">0 / 10 applications this week</div>
           </div>
-          <div class="goal-text" id="goal-text">0 / 10 applications this week</div>
         </div>
       </section>
 
-      <!-- ─── STATS BAR ─── -->
-      <section class="stats-bar" id="stats-bar" aria-label="Application statistics">
-        <div class="stat-tile" data-filter="all" tabindex="0" role="button" aria-label="Total applications">
-          <div class="stat-icon">📋</div>
-          <div class="stat-value" id="stat-total">0</div>
-          <div class="stat-label">Total</div>
-          <div class="stat-accent" style="background: var(--accent-primary)"></div>
+      <section class="analytics-panel hidden" id="analytics-panel" aria-label="Analytics insights">
+        <div class="analytics-header">
+          <h2>Analytics</h2>
+          <div class="analytics-controls">
+            <label for="analytics-metric-select">Regression Metric</label>
+            <select id="analytics-metric-select">
+              <option value="stage">Status of applied jobs</option>
+              <option value="company">Companies and number of applications</option>
+            </select>
+          </div>
         </div>
-        <div class="stat-tile" data-filter="Applied" tabindex="0" role="button" aria-label="Applied">
-          <div class="stat-icon">📤</div>
-          <div class="stat-value" id="stat-applied">0</div>
-          <div class="stat-label">Applied</div>
-          <div class="stat-accent" style="background: var(--accent-info)"></div>
-        </div>
-        <div class="stat-tile" data-filter="Interview" tabindex="0" role="button" aria-label="Interviews">
-          <div class="stat-icon">🎯</div>
-          <div class="stat-value" id="stat-interview">0</div>
-          <div class="stat-label">Interview</div>
-          <div class="stat-accent" style="background: var(--accent-warning)"></div>
-        </div>
-        <div class="stat-tile" data-filter="Offer" tabindex="0" role="button" aria-label="Offers">
-          <div class="stat-icon">🏆</div>
-          <div class="stat-value" id="stat-offers">0</div>
-          <div class="stat-label">Offers</div>
-          <div class="stat-accent" style="background: var(--accent-success)"></div>
-        </div>
-        <div class="stat-tile" data-filter="followup" tabindex="0" role="button" aria-label="Follow-ups due">
-          <div class="stat-icon">⏰</div>
-          <div class="stat-value" id="stat-followup">0</div>
-          <div class="stat-label">Follow-up Due</div>
-          <div class="stat-accent" style="background: var(--accent-secondary)"></div>
-        </div>
-        <div class="stat-tile" data-filter="responserate" tabindex="0" role="button" aria-label="Response rate">
-          <div class="stat-icon">📊</div>
-          <div class="stat-value" id="stat-response">0%</div>
-          <div class="stat-label">Response Rate</div>
-          <div class="stat-accent" style="background: var(--accent-primary)"></div>
+        <div class="analytics-grid">
+          <article class="analytics-card analytics-card-wide">
+            <h3>Regression Insights</h3>
+            <canvas id="analytics-regression-chart" aria-label="Regression chart"></canvas>
+          </article>
+          <article class="analytics-card">
+            <h3>Stage Distribution</h3>
+            <canvas id="analytics-stage-chart" aria-label="Stage distribution chart"></canvas>
+          </article>
+          <article class="analytics-card">
+            <h3>Company Breakdown</h3>
+            <canvas id="analytics-company-chart" aria-label="Company stacked chart"></canvas>
+          </article>
+          <article class="analytics-card">
+            <h3>Success Rate Trends</h3>
+            <canvas id="analytics-trends-chart" aria-label="Application trends chart"></canvas>
+          </article>
         </div>
       </section>
 
-      <!-- Stage Distribution Bar -->
-      <div class="stage-distribution" id="stage-distribution" aria-label="Stage distribution">
-        <!-- Injected by JS as colored proportional segments -->
-      </div>
+      <section class="insights-container" aria-label="Summary, quote and search">
+        <!-- ─── STATS BAR ─── -->
+        <section class="stats-bar" id="stats-bar" aria-label="Application statistics">
+          <div class="stat-tile" data-filter="all" tabindex="0" role="button" aria-label="Total applications">
+            <div class="stat-icon">📋</div>
+            <div class="stat-value" id="stat-total">0</div>
+            <div class="stat-label">Total</div>
+            <div class="stat-accent" style="background: var(--accent-primary)"></div>
+          </div>
+          <div class="stat-tile" data-filter="Applied" tabindex="0" role="button" aria-label="Applied">
+            <div class="stat-icon">📤</div>
+            <div class="stat-value" id="stat-applied">0</div>
+            <div class="stat-label">Applied</div>
+            <div class="stat-accent" style="background: var(--accent-info)"></div>
+          </div>
+          <div class="stat-tile" data-filter="Interview" tabindex="0" role="button" aria-label="Interviews">
+            <div class="stat-icon">🎯</div>
+            <div class="stat-value" id="stat-interview">0</div>
+            <div class="stat-label">Interview</div>
+            <div class="stat-accent" style="background: var(--accent-warning)"></div>
+          </div>
+          <div class="stat-tile" data-filter="Offer" tabindex="0" role="button" aria-label="Offers">
+            <div class="stat-icon">🏆</div>
+            <div class="stat-value" id="stat-offers">0</div>
+            <div class="stat-label">Offers</div>
+            <div class="stat-accent" style="background: var(--accent-success)"></div>
+          </div>
+          <div class="stat-tile" data-filter="followup" tabindex="0" role="button" aria-label="Follow-ups due">
+            <div class="stat-icon">⏰</div>
+            <div class="stat-value" id="stat-followup">0</div>
+            <div class="stat-label">Follow-up Due</div>
+            <div class="stat-accent" style="background: var(--accent-secondary)"></div>
+          </div>
+          <div class="stat-tile" data-filter="responserate" tabindex="0" role="button" aria-label="Response rate">
+            <div class="stat-icon">📊</div>
+            <div class="stat-value" id="stat-response">0%</div>
+            <div class="stat-label">Response Rate</div>
+            <div class="stat-accent" style="background: var(--accent-primary)"></div>
+          </div>
+        </section>
 
-      <!-- ─── SEARCH + FILTER TOOLBAR ─── -->
-      <div class="toolbar" role="search">
-        <div class="search-wrapper">
-          <span class="search-icon" aria-hidden="true">🔍</span>
-          <input
-            type="text"
-            id="search-input"
-            class="search-input"
-            placeholder="Search company, role, contact..."
-            aria-label="Search applications"
-            autocomplete="off"
-          />
-        </div>
-        <div class="filter-chips" id="filter-chips" role="group" aria-label="Filter by stage">
-          <button class="chip chip-active" data-stage="all">All</button>
-          <button class="chip" data-stage="Wishlist">Wishlist</button>
-          <button class="chip" data-stage="Applied">Applied</button>
-          <button class="chip" data-stage="OA/Test">OA/Test</button>
-          <button class="chip" data-stage="Interview">Interview</button>
-          <button class="chip" data-stage="Rejected">Rejected</button>
-          <button class="chip" data-stage="Offer">Offer</button>
-        </div>
-        <div class="sort-wrapper">
-          <select id="sort-select" class="sort-select" aria-label="Sort applications">
-            <option value="deadline-asc">Deadline ↑ Nearest</option>
-            <option value="deadline-desc">Deadline ↓ Furthest</option>
-            <option value="date-desc">Added: Newest</option>
-            <option value="date-asc">Added: Oldest</option>
-            <option value="company-asc">Company A–Z</option>
-            <option value="fit-desc">Fit Rating ↓</option>
-          </select>
-        </div>
-      </div>
+        <!-- ─── MOTIVATIONAL QUOTE ─── -->
+        <section class="quote-banner">
+          <div id="motivational-quote-container" class="quote-text"></div>
+        </section>
 
-      <!-- Active filter indicator -->
-      <div class="active-filter-bar" id="active-filter-bar" hidden>
-        Filtering: <span id="active-filter-label"></span>
-        <button id="clear-filter-btn" aria-label="Clear filter">✕ Clear</button>
-      </div>
+        <!-- ─── SEARCH + FILTER TOOLBAR ─── -->
+        <div class="toolbar" role="search">
+          <div class="search-wrapper">
+            <span class="search-icon" aria-hidden="true">🔍</span>
+            <input
+              type="text"
+              id="search-input"
+              class="search-input"
+              placeholder="Search company, role, contact..."
+              aria-label="Search applications"
+              autocomplete="off"
+            />
+          </div>
+          <div class="filter-chips" id="filter-chips" role="group" aria-label="Filter by stage">
+            <button class="chip chip-active" data-stage="all">All</button>
+            <button class="chip" data-stage="Wishlist">Wishlist</button>
+            <button class="chip" data-stage="Applied">Applied</button>
+            <button class="chip" data-stage="OA/Test">OA/Test</button>
+            <button class="chip" data-stage="Interview">Interview</button>
+            <button class="chip" data-stage="Rejected">Rejected</button>
+            <button class="chip" data-stage="Offer">Offer</button>
+          </div>
+          <div class="sort-wrapper">
+            <select id="sort-select" class="sort-select" aria-label="Sort applications">
+              <option value="deadline-asc">Deadline ↑ Nearest</option>
+              <option value="deadline-desc">Deadline ↓ Furthest</option>
+              <option value="date-desc">Added: Newest</option>
+              <option value="date-asc">Added: Oldest</option>
+              <option value="company-asc">Company A–Z</option>
+              <option value="fit-desc">Fit Rating ↓</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Active filter indicator -->
+        <div class="active-filter-bar" id="active-filter-bar" hidden>
+          Filtering: <span id="active-filter-label"></span>
+          <button id="clear-filter-btn" aria-label="Clear filter">✕ Clear</button>
+        </div>
+      </section>
 
       <!-- ─── KANBAN BOARD ─── -->
       <div class="kanban-board" id="kanban-board" role="region" aria-label="Application pipeline board">
@@ -233,6 +324,7 @@
   <script src="js/auth.js"></script>
 
   <!-- App Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="js/app.js"></script>
 </body>

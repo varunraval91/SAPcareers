@@ -76,21 +76,23 @@
 .auth-logo {
   display: flex;
   justify-content: center;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .auth-logo-icon {
-  width: 60px;
-  height: 60px;
-  background: linear-gradient(135deg, #6C63FF 0%, #8078FF 100%);
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28px;
-  font-weight: 700;
-  color: white;
-  box-shadow: 0 8px 20px rgba(108, 99, 255, 0.3);
+  width: 100px;
+  height: 116px;
+  filter: drop-shadow(0 8px 20px rgba(108, 92, 231, 0.3));
+  animation: floatLogo 3s ease-in-out infinite;
+}
+
+@keyframes floatLogo {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
 }
 
 .auth-title {
