@@ -84,36 +84,84 @@
   init();
 
   function init() {
-      // Check if Firebase is ready
       useFirebase = checkFirebase();
-    
       if (useFirebase) {
-        console.log('✅ Firebase mode enabled');
-        // App layout starts hidden, shown after auth
-        const appLayout = document.querySelector('.app-layout');
-        if (appLayout) {
-          appLayout.style.display = 'none';
-        }
-        // Auth will call loadUserDataAndRender when ready
-        return;
+        console.log('✅ Firebase mode – waiting for auth data');
+      } else {
+        console.log('⚠️ Offline mode (localStorage)');
       }
-    
-      console.log('⚠️ Offline mode (localStorage fallback)');
-    setupTheme();
-    bindEvents();
-    renderUI();
+      setupTheme();
+      bindEvents();
+      renderUI();
   }
 
     // Called by auth.js after user signs in
     function loadUserDataAndRender(userId, applications) {
       currentUserId = userId;
+      useFirebase = !!userId;
       if (applications) {
         state.applications = applications;
       }
-      setupTheme();
-      bindEvents();
+      // On first load with empty data, seed initial jobs
+      if (state.applications.length === 0) {
+        seedInitialJobs();
+      }
       renderUI();
     }
+
+  function seedInitialJobs() {
+    const jobs = [
+      {
+        id: generateId(),
+        company: "Siemens",
+        role: "Working Student Global Communications And Operations Support Mfd",
+        link: "https://jobs.sw.siemens.com/nuremberg-deu/working-student-global-communications-and-operations-support-mfd/6245A7060F154B81B933729607783B05/job/",
+        location: "Nuremberg",
+        reqId: "6245A7060F154B81B933729607783B05",
+        postingDate: "",
+        stage: "Applied",
+        appliedDate: new Date().toISOString().slice(0, 10),
+        deadline: "",
+        contactType: "",
+        contactName: "",
+        contact: "",
+        notes: "",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: generateId(),
+        company: "SAP",
+        role: "SAP Corporate Functions & Analytics iXp Intern (fmd) - Corporate Finance Analytics Team",
+        link: "https://jobs.sap.com/job/Walldorf-SAP-Corporate-Functions-%26-Analytics-iXp-Intern-%28fmd%29-Corporate-Finance-Analytics-Team-69190/1367369733/",
+        location: "Walldorf",
+        reqId: "69190",
+        postingDate: "2026-02-24",
+        stage: "Applied",
+        appliedDate: new Date().toISOString().slice(0, 10),
+        deadline: "",
+        contactType: "",
+        contactName: "",
+        contact: "",
+        notes: "",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ];
+
+    state.applications = jobs;
+
+    if (useFirebase && currentUserId) {
+      jobs.forEach(function(job) {
+        FirebaseAPI.db.saveApplication(currentUserId, job).catch(function(e) {
+          console.error("Seed save error:", e);
+        });
+      });
+    } else {
+      saveApplications();
+    }
+    console.log("✅ Seeded 2 initial jobs (Siemens + SAP)");
+  }
 
   function bindEvents() {
     addListener(DOM.themeToggle, "click", toggleTheme);
@@ -270,12 +318,7 @@
 
       <form id="app-form" style="display:grid;gap:1rem;${isEdit ? "" : "display:none;"}">
         <input type="hidden" id="form-id" value="${app.id}" />
-
-        <div class="form-group">
-          <label for="form-link">Job Link</label>
-          <input type="url" id="form-link" placeholder="https://company.com/job/..." value="${escapeAttr(app.link)}" />
-          <small class="text-muted">Company, role, and posting date are auto-filled from the link.</small>
-        </div>
+        <input type="hidden" id="form-link" value="${escapeAttr(app.link)}" />
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
           <div class="form-group">
@@ -290,8 +333,19 @@
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
           <div class="form-group">
+            <label for="form-location">Location</label>
+            <input type="text" id="form-location" maxlength="120" value="${escapeAttr(app.location || '')}" placeholder="e.g. Walldorf, Munich" />
+          </div>
+          <div class="form-group">
+            <label for="form-req-id">Req ID</label>
+            <input type="text" id="form-req-id" maxlength="120" value="${escapeAttr(app.reqId || '')}" placeholder="Requisition / Job ID" />
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+          <div class="form-group">
             <label for="form-posting-date">Job Posting Date</label>
-            <input type="date" id="form-posting-date" value="${escapeAttr(app.postingDate || "")}" />
+            <input type="date" id="form-posting-date" value="${escapeAttr(app.postingDate || '')}" />
           </div>
           <div class="form-group">
             <label for="form-stage">Stage</label>
@@ -301,18 +355,14 @@
           </div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
           <div class="form-group">
             <label for="form-applied-date">Applied Date</label>
-            <input type="date" id="form-applied-date" value="${escapeAttr(app.appliedDate || "")}" />
+            <input type="date" id="form-applied-date" value="${escapeAttr(app.appliedDate || '')}" />
           </div>
           <div class="form-group">
             <label for="form-deadline">Self Deadline</label>
-            <input type="date" id="form-deadline" value="${escapeAttr(app.deadline || "")}" />
-          </div>
-          <div class="form-group">
-            <label for="form-followup">Follow-up Date</label>
-            <input type="date" id="form-followup" value="${escapeAttr(app.followupDate || "")}" />
+            <input type="date" id="form-deadline" value="${escapeAttr(app.deadline || '')}" />
           </div>
         </div>
 
@@ -328,13 +378,13 @@
           </div>
           <div class="form-group">
             <label for="form-contact-name">Contact Name</label>
-            <input type="text" id="form-contact-name" maxlength="120" value="${escapeAttr(app.contactName || "")}" placeholder="Name of HR/Friend/Employee" />
+            <input type="text" id="form-contact-name" maxlength="120" value="${escapeAttr(app.contactName || '')}" placeholder="Name of HR/Friend/Employee" />
           </div>
         </div>
 
         <div class="form-group">
           <label for="form-notes">Notes</label>
-          <textarea id="form-notes" maxlength="500" placeholder="Any notes...">${escapeHtml(app.notes || "")}</textarea>
+          <textarea id="form-notes" maxlength="500" placeholder="Any notes...">${escapeHtml(app.notes || '')}</textarea>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
@@ -350,12 +400,7 @@
     document.getElementById("cancel-modal-btn").addEventListener("click", closeModal);
     document.getElementById("app-form").addEventListener("submit", saveApplicationFromForm);
 
-    const linkInput = document.getElementById("form-link");
-
     if (isEdit) {
-      linkInput.addEventListener("input", () => applyLinkAutoFill(linkInput.value, false));
-      linkInput.addEventListener("blur", () => applyLinkAutoFill(linkInput.value, false));
-      applyLinkAutoFill(linkInput.value, false);
       return;
     }
 
@@ -404,12 +449,25 @@
             return;
           }
 
+          // Store link in hidden field
+          const hiddenLink = document.getElementById("form-link");
+          if (hiddenLink) hiddenLink.value = linkValue;
+
+          // 1) Try fetching page for structured data
+          showToast("Fetching job details...", "info");
+          const fetched = await fetchJobPageDetails(linkValue);
+
+          // 2) Parse URL for fallback data
           const inferred = inferFromJobLink(linkValue);
+
+          // 3) Merge: fetched data takes priority
           extracted = {
             link: linkValue,
-            company: inferred ? inferred.company : "",
-            role: inferred ? inferred.role : "",
-            postingDate: inferred ? inferred.postingDate : "",
+            company: (fetched && fetched.company) || (inferred && inferred.company) || "",
+            role: (fetched && fetched.title) || (inferred && inferred.role) || "",
+            location: (fetched && fetched.location) || (inferred && inferred.location) || "",
+            reqId: (fetched && fetched.reqId) || (inferred && inferred.reqId) || "",
+            postingDate: (fetched && fetched.postingDate) || (inferred && inferred.postingDate) || "",
             stage: "Applied"
           };
         } else {
@@ -431,10 +489,6 @@
       if (extracted) {
         applyFormData(extracted, true);
       }
-
-      const linkInput = document.getElementById("form-link");
-      linkInput.addEventListener("input", () => applyLinkAutoFill(linkInput.value, false));
-      linkInput.addEventListener("blur", () => applyLinkAutoFill(linkInput.value, false));
 
       const companyVal = getValue("form-company").trim();
       const roleVal = getValue("form-role").trim();
@@ -460,6 +514,8 @@
     const companyEl = document.getElementById("form-company");
     const roleEl = document.getElementById("form-role");
     const postingEl = document.getElementById("form-posting-date");
+    const locationEl = document.getElementById("form-location");
+    const reqIdEl = document.getElementById("form-req-id");
 
     if (companyEl && inferred.company && (force || !companyEl.value.trim())) {
       companyEl.value = inferred.company;
@@ -469,6 +525,12 @@
     }
     if (postingEl && inferred.postingDate && (force || !postingEl.value)) {
       postingEl.value = inferred.postingDate;
+    }
+    if (locationEl && inferred.location && (force || !locationEl.value.trim())) {
+      locationEl.value = inferred.location;
+    }
+    if (reqIdEl && inferred.reqId && (force || !reqIdEl.value.trim())) {
+      reqIdEl.value = inferred.reqId;
     }
   }
 
@@ -555,11 +617,12 @@
     setFormValue("form-link", data.link, force);
     setFormValue("form-company", data.company, force);
     setFormValue("form-role", data.role, force);
+    setFormValue("form-location", data.location, force);
+    setFormValue("form-req-id", data.reqId, force);
     setFormValue("form-posting-date", data.postingDate, force);
     setFormValue("form-stage", data.stage, force);
     setFormValue("form-applied-date", data.appliedDate, force);
     setFormValue("form-deadline", data.deadline, force);
-    setFormValue("form-followup", data.followupDate, force);
     setFormValue("form-contact-type", data.contactType, force);
     setFormValue("form-contact-name", data.contactName, force);
     setFormValue("form-notes", data.notes, force);
@@ -580,76 +643,119 @@
     el.value = value;
   }
 
-  function inferFromJobLink(rawLink) {
-    if (!rawLink) {
-      return null;
-    }
+  // ── Fetch job page for structured data (JSON-LD / meta) ──
+  async function fetchJobPageDetails(url) {
+    try {
+      const resp = await fetch(url, { redirect: 'follow' });
+      if (!resp.ok) return null;
+      const html = await resp.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
 
+      // Try JSON-LD
+      for (const script of doc.querySelectorAll('script[type="application/ld+json"]')) {
+        try {
+          let data = JSON.parse(script.textContent);
+          if (Array.isArray(data)) data = data.find(d => d['@type'] === 'JobPosting');
+          if (data && data['@type'] === 'JobPosting') {
+            const loc = data.jobLocation;
+            let locStr = '';
+            if (loc) {
+              if (Array.isArray(loc)) locStr = loc.map(l => l.address?.addressLocality || l.name || '').filter(Boolean).join(', ');
+              else locStr = loc.address?.addressLocality || loc.name || '';
+            }
+            return {
+              title: data.title || '',
+              company: data.hiringOrganization?.name || '',
+              postingDate: data.datePosted ? data.datePosted.slice(0, 10) : '',
+              location: locStr,
+              reqId: data.identifier?.value || data.identifier?.name || ''
+            };
+          }
+        } catch { /* ignore bad JSON */ }
+      }
+
+      // Fallback: meta tags (itemprop, og, etc.)
+      let postingDate = '';
+      const datePostedMeta = doc.querySelector('meta[itemprop="datePosted"]');
+      if (datePostedMeta) {
+        const raw = datePostedMeta.getAttribute('content') || '';
+        const d = new Date(raw);
+        if (!isNaN(d.getTime())) postingDate = d.toISOString().slice(0, 10);
+      }
+      const ogTitle = doc.querySelector('meta[property="og:title"]');
+      const title = ogTitle ? ogTitle.content : '';
+      if (postingDate || title) {
+        return { title, postingDate, company: '', location: '', reqId: '' };
+      }
+      return null;
+    } catch {
+      return null; // CORS or network error
+    }
+  }
+
+  function inferFromJobLink(rawLink) {
+    if (!rawLink) return null;
     try {
       const url = new URL(rawLink);
-      const hostParts = url.hostname.replace("www.", "").split(".");
-      const company = hostParts.length >= 2 ? toTitleCase(hostParts[hostParts.length - 2].replace(/[-_]/g, " ")) : "";
+      const host = url.hostname.replace('www.', '').toLowerCase();
+      const segments = url.pathname.split('/').filter(Boolean).map(s => decodeURIComponent(s));
 
-      const segments = url.pathname.split("/").filter(Boolean).map((part) => decodeURIComponent(part));
-      const role = inferRoleFromUrl(url, segments);
+      // Company from hostname
+      let company = '';
+      if (host.includes('sap.com')) company = 'SAP';
+      else if (host.includes('siemens.com')) company = 'Siemens';
+      else if (host.includes('bosch.com')) company = 'Bosch';
+      else if (host.includes('bmw.com')) company = 'BMW';
+      else {
+        const parts = host.split('.');
+        company = parts.length >= 2 ? toTitleCase(parts[parts.length - 2].replace(/[-_]/g, ' ')) : '';
+      }
 
-      const postingDate = extractDateFromString(`${url.pathname} ${url.search}`);
+      let role = '', location = '', reqId = '';
 
-      return {
-        company: company || "",
-        role: role || "",
-        postingDate: postingDate || ""
-      };
-    } catch {
-      return null;
-    }
+      // SAP pattern: /job/{City}-{Role}-{ID}/{ID}/
+      if (host.includes('sap.com') && segments[0] === 'job' && segments.length >= 2) {
+        const slug = segments[1];
+        const parts = slug.split('-');
+        if (parts.length > 2) {
+          location = toTitleCase(parts[0]);
+          const last = parts[parts.length - 1];
+          if (/^\d+$/.test(last)) {
+            reqId = last;
+            role = toTitleCase(parts.slice(1, -1).join(' '));
+          } else {
+            role = toTitleCase(parts.slice(1).join(' '));
+          }
+        }
+        // second segment may also be a numeric ID
+        if (segments[2] && /^\d+$/.test(segments[2])) {
+          reqId = reqId || segments[2];
+        }
+      }
+      // Siemens pattern: /{location}/{role-slug}/{hex-id}/job/
+      else if (host.includes('siemens.com') && segments.length >= 3) {
+        location = toTitleCase(segments[0].replace(/-deu|-usa|-gbr|-ind|-chn|-fra/gi, '').replace(/-/g, ' '));
+        role = toTitleCase(segments[1].replace(/-/g, ' '));
+        if (/^[0-9A-F]{10,}$/i.test(segments[2])) reqId = segments[2];
+      }
+      // Generic fallback
+      else {
+        role = inferRoleFromUrlGeneric(url, segments);
+      }
+
+      const postingDate = extractDateFromString(url.pathname + ' ' + url.search);
+      return { company, role, location, reqId, postingDate: postingDate || '' };
+    } catch { return null; }
   }
 
-  function inferRoleFromUrl(url, segments) {
-    const genericSegments = new Set([
-      "jobs", "job", "careers", "career", "apply", "position", "positions", "vacancies", "opening", "openings", "view"
-    ]);
-
-    const candidates = [];
-
-    for (let i = segments.length - 1; i >= 0; i -= 1) {
-      const segment = sanitizeRoleSegment(segments[i]);
-      if (!segment) {
-        continue;
-      }
-      if (genericSegments.has(segment.toLowerCase())) {
-        continue;
-      }
-      candidates.push(segment);
-    }
-
-    const queryKeys = ["title", "jobtitle", "role", "position", "job"];
-    queryKeys.forEach((key) => {
-      const val = url.searchParams.get(key);
-      const clean = sanitizeRoleSegment(val || "");
-      if (clean) {
-        candidates.push(clean);
-      }
-    });
-
-    const best = candidates
-      .sort((a, b) => b.length - a.length)
-      .find((item) => item.length >= 3);
-
-    return best ? toTitleCase(best) : "";
-  }
-
-  function sanitizeRoleSegment(value) {
-    if (!value) {
-      return "";
-    }
-    return String(value)
-      .replace(/\.[a-zA-Z0-9]+$/, "")
-      .replace(/[0-9]{3,}/g, " ")
-      .replace(/[+_\-]+/g, " ")
-      .replace(/[^a-zA-Z\s]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+  function inferRoleFromUrlGeneric(url, segments) {
+    const skip = new Set(['jobs','job','careers','career','apply','position','positions','vacancies','opening','openings','view']);
+    const candidates = segments
+      .map(s => s.replace(/\.[a-zA-Z0-9]+$/, '').replace(/[0-9]{3,}/g, ' ').replace(/[+_\-]+/g, ' ').replace(/[^a-zA-Z\s]/g, ' ').replace(/\s+/g, ' ').trim())
+      .filter(s => s.length >= 3 && !skip.has(s.toLowerCase()));
+    const best = candidates.sort((a, b) => b.length - a.length)[0];
+    return best ? toTitleCase(best) : '';
   }
 
   function saveApplicationFromForm(event) {
@@ -659,11 +765,12 @@
     const typedCompany = getValue("form-company").trim();
     const typedRole = getValue("form-role").trim();
     const link = getValue("form-link").trim();
+    const typedLocation = getValue("form-location").trim();
+    const typedReqId = getValue("form-req-id").trim();
     const typedPostingDate = getValue("form-posting-date");
     const stage = getValue("form-stage") || "Applied";
     const appliedDate = getValue("form-applied-date");
     const deadline = getValue("form-deadline");
-    const followupDate = getValue("form-followup");
     const contactType = getValue("form-contact-type");
     const contactName = getValue("form-contact-name").trim();
     const notes = getValue("form-notes").trim();
@@ -672,6 +779,8 @@
     const company = typedCompany || (inferred ? inferred.company : "") || (link ? "Unknown Company" : "");
     const role = typedRole || (inferred ? inferred.role : "") || (link ? "Unknown Role" : "");
     const postingDate = typedPostingDate || (inferred ? inferred.postingDate : "") || "";
+    const location = typedLocation || (inferred ? inferred.location : "") || "";
+    const reqId = typedReqId || (inferred ? inferred.reqId : "") || "";
 
     if (!company || !role) {
       showToast("Please provide a Job Link or upload an attachment", "error");
@@ -683,11 +792,12 @@
       company,
       role,
       link,
+      location,
+      reqId,
       postingDate,
       stage,
       appliedDate,
       deadline,
-      followupDate,
       contactType,
       contactName,
       contact: [contactType, contactName].filter(Boolean).join(": "),
@@ -730,11 +840,7 @@
       }
     
     closeModal();
-    
-      // Only re-render if not using Firebase real-time updates
-      if (!useFirebase) {
-        renderUI();
-      }
+    renderUI();
   }
 
   function renderStats() {
@@ -843,7 +949,7 @@
     card.innerHTML = `
       <div class="card-header">
         <div>
-          <p class="card-company">${escapeHtml(app.company)}</p>
+          <p class="card-company">${escapeHtml(app.company)}${app.location ? ' &middot; ' + escapeHtml(app.location) : ''}</p>
           <h4 class="card-title">${escapeHtml(app.role)}</h4>
         </div>
       </div>
@@ -852,7 +958,7 @@
         <span class="card-meta-item">Applied: ${appliedText}</span>
         <span class="card-meta-item">Deadline: ${deadlineText}</span>
       </div>
-      ${app.followupDate ? `<div class="card-meta-item">Follow-up: ${formatDate(app.followupDate)}</div>` : ""}
+      ${app.reqId ? `<div class="card-meta-item">Req ID: ${escapeHtml(app.reqId)}</div>` : ""}
       ${app.contactType || app.contactName ? `<div class="card-meta-item">Contact: ${escapeHtml([app.contactType, app.contactName].filter(Boolean).join(" - "))}</div>` : ""}
       ${app.link ? `<a href="${escapeAttr(app.link)}" target="_blank" rel="noopener noreferrer">Open Job Link</a>` : ""}
       ${app.notes ? `<div class="card-notes">${escapeHtml(app.notes)}</div>` : ""}
@@ -892,13 +998,9 @@
           });
       } else {
         saveApplications();
-        renderUI();
       }
     
-      if (!useFirebase) {
-        renderUI();
-      }
-    
+    renderUI();
     showToast("Application deleted");
   }
 
@@ -1029,13 +1131,12 @@
     normalized.link = link;
     normalized.company = valueFromMap(map, ["company", "companyname"]) || (inferred ? inferred.company : "");
     normalized.role = valueFromMap(map, ["jobtitle", "title", "role", "position"]) || (inferred ? inferred.role : "");
+    normalized.location = valueFromMap(map, ["location", "city", "joblocation"]) || (inferred ? inferred.location : "");
+    normalized.reqId = valueFromMap(map, ["reqid", "requisitionid", "jobid", "referenceid"]) || (inferred ? inferred.reqId : "");
     normalized.postingDate = toIsoDate(valueFromMap(map, ["jobpostingdate", "postingdate", "posteddate"]) || (inferred ? inferred.postingDate : ""));
     normalized.stage = valueFromMap(map, ["stage"]) || "Applied";
     normalized.appliedDate = toIsoDate(valueFromMap(map, ["applieddate", "dateapplied"]));
     normalized.deadline = toIsoDate(valueFromMap(map, ["selfdeadline", "deadline"]));
-    normalized.followupDate = toIsoDate(
-      valueFromMap(map, ["followupdate", "followup", "followupon", "nextfollowup"])
-    );
     normalized.contactType = valueFromMap(map, ["contacttype", "contactpersontype"]);
     normalized.contactName = valueFromMap(map, ["contactname", "contactperson", "contact"]);
     normalized.contact = [normalized.contactType, normalized.contactName].filter(Boolean).join(": ");
@@ -1073,12 +1174,13 @@
     const headers = [
       "Company",
       "Job Title",
+      "Location",
+      "Req ID",
       "Job Link",
       "Job Posting Date",
       "Stage",
       "Applied Date",
       "Self Deadline",
-      "Follow-up Date",
       "Contact Type",
       "Contact Name",
       "Notes"
@@ -1087,12 +1189,13 @@
     const rows = state.applications.map((app) => [
       app.company || "",
       app.role || "",
+      app.location || "",
+      app.reqId || "",
       app.link || "",
       app.postingDate || "",
       app.stage || "",
       app.appliedDate || "",
       app.deadline || "",
-      app.followupDate || "",
       app.contactType || "",
       app.contactName || "",
       app.notes || ""
@@ -1248,11 +1351,12 @@
       company: "",
       role: "",
       link: "",
+      location: "",
+      reqId: "",
       postingDate: "",
       stage: "Applied",
       appliedDate: "",
       deadline: "",
-      followupDate: "",
       contactType: "",
       contactName: "",
       contact: "",
