@@ -94,9 +94,6 @@ This repository is prepared to avoid exposing private credentials in current fil
 - `tools/sap_web_scraping.py` no longer contains personal portal tokens/URLs.
 - `data/sample_applications.csv` contains non-personal sample data.
 
-Important:
-- Git history previously contained Firebase project values and a direct SAP portal URL token.
-- Even after cleaning current files, already-pushed history may still contain old values.
 
 Recommended immediate actions for public repositories:
 1. Rotate Firebase credentials / regenerate keys and update project restrictions in Firebase and Google Cloud.
