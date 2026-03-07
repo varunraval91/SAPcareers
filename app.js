@@ -602,7 +602,9 @@
       link,
       company: map.company || map.companyname || (inferred ? inferred.company : ""),
       role: map.jobtitle || map.title || map.role || (inferred ? inferred.role : ""),
-      postingDate: toIsoDate(map.jobpostingdate || map.postingdate || map.posteddate || (inferred ? inferred.postingDate : "")),
+      location: map.location || map.city || map.joblocation || (inferred ? inferred.location : ""),
+      reqId: map.reqid || map.jobid || map.jobnumber || map.requisitionid || map.requesitionid || map.requisitionnumber || map.fullrequisitionid || map.referenceid || map.referencenumber || (inferred ? inferred.reqId : ""),
+      postingDate: toIsoDate(map.jobpostingdate || map.jobpostdate || map.postingdate || map.jobpost || map.posteddate || map.publicationdate || map.publisheddate || map.dateposted || map.datepublished || (inferred ? inferred.postingDate : "")),
       stage: map.stage || "Applied",
       appliedDate: toIsoDate(map.applieddate || map.dateapplied || ""),
       deadline: toIsoDate(map.selfdeadline || map.deadline || ""),
@@ -663,7 +665,7 @@
       }
 
       // Human-readable fallback: Feb 24, 2026
-      const friendly = text.match(/(?:posted|date\s*posted|published)[^\n\r<]{0,40}([A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4})/i);
+      const friendly = text.match(/(?:job\s*post(?:ing)?\s*date|posting\s*date|publication\s*date|posted|date\s*posted|published|date\s*published|published\s*on)[^\n\r<]{0,60}([A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4})/i);
       if (friendly && friendly[1]) {
         const parsed = new Date(friendly[1]);
         if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
@@ -672,9 +674,18 @@
       return "";
     };
 
+    const extractReqIdFromText = (text) => {
+      if (!text) return "";
+      const compact = String(text).replace(/\s+/g, " ");
+      const match = compact.match(/(?:job\s*number|job\s*id|req\s*id|requisition\s*id|requesition\s*id|requisition\s*number|full\s*requisition\s*id|reference\s*id|reference\s*number)\s*[:#-]?\s*([A-Za-z0-9][A-Za-z0-9._-]{2,})/i);
+      return match && match[1] ? String(match[1]).trim() : "";
+    };
+
     const parseHtmlForJobMeta = (html) => {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
+
+      let extracted = { title: "", company: "", postingDate: "", location: "", reqId: "" };
 
       for (const script of doc.querySelectorAll('script[type="application/ld+json"]')) {
         try {
@@ -687,20 +698,21 @@
               if (Array.isArray(loc)) locStr = loc.map(l => l.address?.addressLocality || l.name || '').filter(Boolean).join(', ');
               else locStr = loc.address?.addressLocality || loc.name || '';
             }
-            return {
+            extracted = {
               title: data.title || '',
               company: data.hiringOrganization?.name || '',
               postingDate: data.datePosted ? data.datePosted.slice(0, 10) : '',
               location: locStr,
               reqId: data.identifier?.value || data.identifier?.name || ''
             };
+            break;
           }
         } catch {
           // ignore malformed JSON-LD blocks
         }
       }
 
-      let postingDate = '';
+      let postingDate = extracted.postingDate || '';
       const datePostedMeta = doc.querySelector('meta[itemprop="datePosted"]');
       if (datePostedMeta) {
         const raw = datePostedMeta.getAttribute('content') || '';
@@ -712,10 +724,34 @@
         postingDate = extractPostingDateFromText(html);
       }
 
+      let reqId = extracted.reqId || '';
+      if (!reqId) {
+        const reqMetaCandidates = [
+          'meta[itemprop="identifier"]',
+          'meta[name="job_id"]',
+          'meta[name="jobid"]',
+          'meta[name="reqid"]',
+          'meta[name="requisitionid"]'
+        ];
+        for (const selector of reqMetaCandidates) {
+          const node = doc.querySelector(selector);
+          const val = node ? (node.getAttribute('content') || '').trim() : '';
+          if (val) {
+            reqId = val;
+            break;
+          }
+        }
+      }
+      if (!reqId) {
+        reqId = extractReqIdFromText(html);
+      }
+
       const ogTitle = doc.querySelector('meta[property="og:title"]');
-      const title = ogTitle ? ogTitle.content : '';
-      if (postingDate || title) {
-        return { title, postingDate, company: '', location: '', reqId: '' };
+      const title = extracted.title || (ogTitle ? ogTitle.content : '');
+      const company = extracted.company || '';
+      const location = extracted.location || '';
+      if (postingDate || title || reqId || company || location) {
+        return { title, postingDate, company, location, reqId };
       }
       return null;
     };
@@ -791,7 +827,29 @@
         role = inferRoleFromUrlGeneric(url, segments);
       }
 
-      const postingDate = extractDateFromString(url.pathname + ' ' + url.search);
+      const params = url.searchParams;
+      const reqFromParams = [
+        params.get('jobId'),
+        params.get('jobID'),
+        params.get('reqId'),
+        params.get('requisitionId'),
+        params.get('requesitionId'),
+        params.get('jobNumber')
+      ].find(Boolean);
+      if (!reqId && reqFromParams) {
+        reqId = String(reqFromParams).trim();
+      }
+
+      const postingDate = extractDateFromString(
+        [
+          url.pathname,
+          url.search,
+          params.get('postingDate') || '',
+          params.get('publicationDate') || '',
+          params.get('publishedDate') || ''
+        ].join(' ')
+      );
+
       return { company, role, location, reqId, postingDate: postingDate || '' };
     } catch { return null; }
   }
@@ -1176,8 +1234,8 @@
     normalized.company = valueFromMap(map, ["company", "companyname"]) || (inferred ? inferred.company : "");
     normalized.role = valueFromMap(map, ["jobtitle", "title", "role", "position"]) || (inferred ? inferred.role : "");
     normalized.location = valueFromMap(map, ["location", "city", "joblocation"]) || (inferred ? inferred.location : "");
-    normalized.reqId = valueFromMap(map, ["reqid", "requisitionid", "jobid", "referenceid"]) || (inferred ? inferred.reqId : "");
-    normalized.postingDate = toIsoDate(valueFromMap(map, ["jobpostingdate", "postingdate", "posteddate"]) || (inferred ? inferred.postingDate : ""));
+    normalized.reqId = valueFromMap(map, ["reqid", "requisitionid", "requesitionid", "requisitionnumber", "fullrequisitionid", "jobid", "jobnumber", "referenceid", "referencenumber"]) || (inferred ? inferred.reqId : "");
+    normalized.postingDate = toIsoDate(valueFromMap(map, ["jobpostingdate", "jobpostdate", "postingdate", "jobpost", "posteddate", "publicationdate", "publisheddate", "dateposted", "datepublished"]) || (inferred ? inferred.postingDate : ""));
     normalized.stage = valueFromMap(map, ["stage"]) || "Applied";
     normalized.appliedDate = toIsoDate(valueFromMap(map, ["applieddate", "dateapplied"]));
     normalized.deadline = toIsoDate(valueFromMap(map, ["selfdeadline", "deadline"]));
