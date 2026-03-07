@@ -219,6 +219,16 @@ a:hover {
   gap: 0.5rem;
 }
 
+.account-status {
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
 .sidebar-footer button {
   padding: 0.75rem;
   background: var(--bg-elevated);
@@ -954,6 +964,65 @@ a:hover {
 .form-group textarea {
   resize: vertical;
   min-height: 100px;
+}
+
+.extract-loader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.extract-loader.hidden {
+  display: none;
+}
+
+.loader-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: loaderSpin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes loaderSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.auth-panel {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.auth-panel-title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.auth-panel-subtitle {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.auth-panel-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .auth-panel-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════ */

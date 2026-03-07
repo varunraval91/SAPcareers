@@ -55,7 +55,9 @@
     modalBox: document.getElementById("modal-box"),
     themeToggle: document.getElementById("theme-toggle"),
     themeIcon: document.getElementById("theme-icon"),
+    accountStatus: document.getElementById("account-status"),
     accountSyncBtn: document.getElementById("account-sync-btn"),
+    accountLogoutBtn: document.getElementById("account-logout-btn"),
     importBtn: document.getElementById("import-data-btn"),
     importFileInput: document.getElementById("import-file-input"),
     exportCsvBtn: document.getElementById("export-csv-btn"),
@@ -93,6 +95,10 @@
       }
       setupTheme();
       bindEvents();
+      const currentUser = (typeof FirebaseAPI !== "undefined" && FirebaseAPI.auth && typeof FirebaseAPI.auth.getCurrentUser === "function")
+        ? FirebaseAPI.auth.getCurrentUser()
+        : null;
+      updateAccountStatusUI(currentUser);
       renderUI();
   }
 
@@ -103,12 +109,16 @@
       if (applications) {
         state.applications = applications;
       }
+      if (typeof FirebaseAPI !== "undefined" && FirebaseAPI.auth && typeof FirebaseAPI.auth.getCurrentUser === "function") {
+        updateAccountStatusUI(FirebaseAPI.auth.getCurrentUser());
+      }
       renderUI();
     }
 
   function bindEvents() {
     addListener(DOM.themeToggle, "click", toggleTheme);
     addListener(DOM.accountSyncBtn, "click", openAccountSyncFlow);
+    addListener(DOM.accountLogoutBtn, "click", handleLogout);
     addListener(DOM.importBtn, "click", () => {
       if (DOM.importFileInput) {
         DOM.importFileInput.click();
@@ -214,68 +224,160 @@
     showToast(`Switched to ${state.theme} mode`);
   }
 
-  async function openAccountSyncFlow() {
+  function openAccountSyncFlow() {
     if (typeof FirebaseAPI === "undefined" || !FirebaseAPI.auth) {
       showToast("Firebase not ready yet", "warning");
       return;
     }
 
-    const mode = window.prompt(
-      "Account Sync\n\n1 = Link current data to email (first-time setup)\n2 = Sign in with existing email (new browser/device)",
-      "1"
-    );
-    if (mode === null) return;
+    DOM.modalBox.innerHTML = `
+      <div class="auth-panel">
+        <div class="auth-panel-title">Account Login & Sync</div>
+        <div class="auth-panel-subtitle">Use one email account across browsers/devices. Existing guest data can be upgraded safely.</div>
 
-    const email = (window.prompt("Enter email") || "").trim();
-    if (!email || !email.includes("@")) {
-      showToast("Enter a valid email", "error");
-      return;
-    }
+        <div class="form-group">
+          <label for="auth-email">Email</label>
+          <input type="email" id="auth-email" placeholder="you@example.com" />
+        </div>
 
-    const password = window.prompt("Enter password (min 6 chars)") || "";
-    if (!password || password.length < 6) {
-      showToast("Password must be at least 6 characters", "error");
+        <div class="form-group">
+          <label for="auth-password">Password</label>
+          <input type="password" id="auth-password" placeholder="Minimum 6 characters" />
+        </div>
+
+        <div class="form-group" style="margin:0;display:flex;gap:0.5rem;align-items:flex-start;">
+          <input type="checkbox" id="auth-upgrade-guest" checked />
+          <label for="auth-upgrade-guest" style="margin:0;">If currently in guest mode, migrate all guest applications to this email account.</label>
+        </div>
+
+        <div id="auth-status" class="text-muted" style="font-size:var(--text-sm);min-height:1.2rem;"></div>
+
+        <div class="auth-panel-actions">
+          <button type="button" class="btn btn-secondary" id="auth-close-btn">Cancel</button>
+          <button type="button" class="btn btn-primary" id="auth-signin-btn">Sign In</button>
+          <button type="button" class="btn btn-secondary" id="auth-create-btn">Create Account</button>
+          <button type="button" class="btn btn-primary" id="auth-upgrade-btn">Create & Migrate Guest Data</button>
+        </div>
+      </div>
+    `;
+
+    DOM.modalBackdrop.classList.remove("hidden");
+
+    const emailEl = document.getElementById("auth-email");
+    const passwordEl = document.getElementById("auth-password");
+    const upgradeEl = document.getElementById("auth-upgrade-guest");
+    const statusEl = document.getElementById("auth-status");
+    const closeBtn = document.getElementById("auth-close-btn");
+    const signInBtn = document.getElementById("auth-signin-btn");
+    const createBtn = document.getElementById("auth-create-btn");
+    const upgradeBtn = document.getElementById("auth-upgrade-btn");
+
+    const setBusy = (busy, message = "") => {
+      [signInBtn, createBtn, upgradeBtn, closeBtn, emailEl, passwordEl, upgradeEl].forEach((el) => {
+        if (el) el.disabled = busy;
+      });
+      if (statusEl) {
+        statusEl.textContent = message;
+      }
+    };
+
+    const readCreds = () => {
+      const email = (emailEl?.value || "").trim();
+      const password = passwordEl?.value || "";
+      if (!email || !email.includes("@")) {
+        throw new Error("Enter a valid email");
+      }
+      if (!password || password.length < 6) {
+        throw new Error("Password must be at least 6 characters");
+      }
+      return { email, password };
+    };
+
+    const mapAuthError = (error) => {
+      const code = error && error.code ? error.code : "";
+      if (code === "auth/email-already-in-use") return "Email already exists. Use Sign In.";
+      if (code === "auth/wrong-password" || code === "auth/invalid-credential") return "Wrong email/password";
+      if (code === "auth/user-not-found") return "Account not found. Create account first.";
+      if (code === "auth/operation-not-allowed") return "Email/password provider is disabled in Firebase.";
+      return (error && error.message) || "Authentication failed";
+    };
+
+    closeBtn?.addEventListener("click", closeModal);
+
+    signInBtn?.addEventListener("click", async () => {
+      try {
+        const { email, password } = readCreds();
+        setBusy(true, "Signing in...");
+        await FirebaseAPI.auth.signInWithEmail(email, password);
+        closeModal();
+        showToast("Signed in. Syncing data from cloud...");
+      } catch (error) {
+        showToast(mapAuthError(error), "error");
+        setBusy(false, "");
+      }
+    });
+
+    createBtn?.addEventListener("click", async () => {
+      try {
+        const { email, password } = readCreds();
+        setBusy(true, "Creating account...");
+        await FirebaseAPI.auth.createUserWithEmail(email, password);
+        closeModal();
+        showToast("Account created successfully");
+      } catch (error) {
+        showToast(mapAuthError(error), "error");
+        setBusy(false, "");
+      }
+    });
+
+    upgradeBtn?.addEventListener("click", async () => {
+      try {
+        const { email, password } = readCreds();
+        const shouldMigrate = Boolean(upgradeEl?.checked);
+        setBusy(true, shouldMigrate ? "Migrating guest data to new account..." : "Creating account...");
+
+        if (shouldMigrate) {
+          await FirebaseAPI.auth.upgradeAnonymousToEmail(email, password);
+          closeModal();
+          showToast("Guest account upgraded and data migrated");
+          return;
+        }
+
+        await FirebaseAPI.auth.createUserWithEmail(email, password);
+        closeModal();
+        showToast("Account created successfully");
+      } catch (error) {
+        showToast(mapAuthError(error), "error");
+        setBusy(false, "");
+      }
+    });
+  }
+
+  async function handleLogout() {
+    if (typeof FirebaseAPI === "undefined" || !FirebaseAPI.auth) {
+      showToast("Firebase not ready yet", "warning");
       return;
     }
 
     try {
-      if (mode.trim() === "2") {
-        await FirebaseAPI.auth.signInWithEmail(email, password);
-        showToast("Signed in. Syncing data from cloud...");
-        return;
-      }
-
-      const current = FirebaseAPI.auth.getCurrentUser();
-      if (!current) {
-        showToast("No active session. Reload and retry.", "warning");
-        return;
-      }
-
-      if (current.isAnonymous) {
-        await FirebaseAPI.auth.upgradeAnonymousToEmail(email, password);
-        showToast("Account upgraded! Use this email on all devices.");
-        // Data will sync automatically via onAuthStateChanged
-      } else {
-        // Already permanent account: just verify credentials
-        await FirebaseAPI.auth.signInWithEmail(email, password);
-        showToast("Email account already active.");
-      }
+      await FirebaseAPI.auth.signOut();
+      showToast("Logged out. Guest session will start automatically.", "info");
     } catch (error) {
-      const code = error && error.code ? error.code : "";
-      if (code === "auth/email-already-in-use") {
-        showToast("Email already linked. Use option 2 to sign in.", "warning");
-        return;
-      }
-      if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
-        showToast("Wrong email/password", "error");
-        return;
-      }
-      if (code === "auth/user-not-found") {
-        showToast("Account not found. Use option 1 on original browser first.", "warning");
-        return;
-      }
-      showToast((error && error.message) || "Account sync failed", "error");
+      showToast((error && error.message) || "Logout failed", "error");
     }
+  }
+
+  function updateAccountStatusUI(user) {
+    if (!DOM.accountStatus) return;
+    if (!user) {
+      DOM.accountStatus.textContent = "No session";
+      return;
+    }
+    if (user.isAnonymous) {
+      DOM.accountStatus.textContent = "Guest session";
+      return;
+    }
+    DOM.accountStatus.textContent = user.email || "Email account";
   }
 
   function renderUI() {
@@ -319,6 +421,10 @@
 
         <div style="display:flex;justify-content:flex-end;">
           <button type="button" class="btn btn-primary" id="extract-continue-btn">Extract and Continue</button>
+        </div>
+        <div id="extract-loader" class="extract-loader hidden" aria-live="polite">
+          <span class="loader-spinner" aria-hidden="true"></span>
+          <span id="extract-loader-text">Fetching job details...</span>
         </div>
         <small class="text-muted">Step 2 form will open after extraction. If extraction is partial, you can manually edit before saving.</small>
       </section>
@@ -421,8 +527,22 @@
     const extractBtn = document.getElementById("extract-continue-btn");
     const sourceLinkInput = document.getElementById("source-link-input");
     const sourceFileInput = document.getElementById("source-file-input");
+    const extractLoader = document.getElementById("extract-loader");
+    const extractLoaderText = document.getElementById("extract-loader-text");
 
     let sourceMode = "";
+
+    function setExtractionLoading(isLoading, message) {
+      if (extractLoader) {
+        extractLoader.classList.toggle("hidden", !isLoading);
+      }
+      if (extractLoaderText && message) {
+        extractLoaderText.textContent = message;
+      }
+      [extractBtn, linkBtn, fileBtn, sourceLinkInput, sourceFileInput].forEach((el) => {
+        if (el) el.disabled = isLoading;
+      });
+    }
 
     function setSourceMode(mode) {
       sourceMode = mode;
@@ -446,10 +566,12 @@
 
       let extracted = null;
       try {
+        setExtractionLoading(true, "Starting extraction...");
         if (sourceMode === "link") {
           const linkValue = (sourceLinkInput.value || "").trim();
           if (!linkValue) {
             showToast("Please provide a job link", "warning");
+            setExtractionLoading(false);
             return;
           }
 
@@ -458,10 +580,11 @@
           if (hiddenLink) hiddenLink.value = linkValue;
 
           // 1) Try fetching page for structured data
-          showToast("Fetching job details...", "info");
+          setExtractionLoading(true, "Fetching and scraping webpage...");
           const fetched = await fetchJobPageDetails(linkValue);
 
           // 2) Parse URL for fallback data
+          setExtractionLoading(true, "Parsing URL and merging fields...");
           const inferred = inferFromJobLink(linkValue);
 
           // 3) Merge: fetched data takes priority
@@ -478,13 +601,18 @@
           const [file] = sourceFileInput.files || [];
           if (!file) {
             showToast("Please choose a file", "warning");
+            setExtractionLoading(false);
             return;
           }
+          setExtractionLoading(true, "Reading and parsing attachment...");
           extracted = await parseFormAttachment(file);
         }
       } catch (error) {
+        setExtractionLoading(false);
         showToast(error.message || "Failed to extract data", "error");
         return;
+      } finally {
+        setExtractionLoading(false);
       }
 
       form.style.display = "grid";
@@ -664,6 +792,12 @@
         if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
       }
 
+      // Label-based ISO date (Listed, publication date, etc.)
+      const labeledIso = text.match(/(?:job\s*post(?:ing)?\s*date|posting\s*date|publication\s*date|posted\s*date|listed|date\s*posted|published|date\s*published|published\s*on)\s*[:#-]?\s*(20\d{2}[-\/](0?[1-9]|1[0-2])[-\/](0?[1-9]|[12]\d|3[01]))/i);
+      if (labeledIso && labeledIso[1]) {
+        return toIsoDate(labeledIso[1]);
+      }
+
       // Human-readable fallback: Feb 24, 2026
       const friendly = text.match(/(?:job\s*post(?:ing)?\s*date|posting\s*date|publication\s*date|posted|date\s*posted|published|date\s*published|published\s*on)[^\n\r<]{0,60}([A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4})/i);
       if (friendly && friendly[1]) {
@@ -674,6 +808,15 @@
       return "";
     };
 
+    const extractLocationFromText = (text) => {
+      if (!text) return "";
+      const compact = String(text).replace(/\s+/g, " ");
+      const match = compact.match(/(?:location|city|job\s*location)\s*[:#-]?\s*([^\n\r<|;]{2,90})/i);
+      if (!match || !match[1]) return "";
+      const value = match[1].trim();
+      return value.replace(/\s{2,}/g, " ").replace(/[.,;:]+$/, "");
+    };
+
     const extractReqIdFromText = (text) => {
       if (!text) return "";
       const compact = String(text).replace(/\s+/g, " ");
@@ -681,9 +824,27 @@
       return match && match[1] ? String(match[1]).trim() : "";
     };
 
+    const parseDbApiPayload = (payload) => {
+      if (!payload || typeof payload !== "object") return null;
+      const html = payload.html || "";
+      const applyUri = payload.apply_uri || "";
+      if (!html && !applyUri) return null;
+
+      const parsed = parseHtmlForJobMeta(html || "");
+      const inferredApply = applyUri ? inferFromJobLink(applyUri) : null;
+      return {
+        title: (parsed && parsed.title) || (inferredApply && inferredApply.role) || "",
+        company: (parsed && parsed.company) || "Deutsche Bank",
+        postingDate: (parsed && parsed.postingDate) || "",
+        location: (parsed && parsed.location) || (inferredApply && inferredApply.location) || "",
+        reqId: (parsed && parsed.reqId) || (inferredApply && inferredApply.reqId) || ""
+      };
+    };
+
     const parseHtmlForJobMeta = (html) => {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
+      const fullText = [doc.body ? doc.body.textContent : "", html].join(" ");
 
       let extracted = { title: "", company: "", postingDate: "", location: "", reqId: "" };
 
@@ -721,7 +882,7 @@
       }
 
       if (!postingDate) {
-        postingDate = extractPostingDateFromText(html);
+        postingDate = extractPostingDateFromText(fullText);
       }
 
       let reqId = extracted.reqId || '';
@@ -743,18 +904,67 @@
         }
       }
       if (!reqId) {
-        reqId = extractReqIdFromText(html);
+        reqId = extractReqIdFromText(fullText);
+      }
+
+      let location = extracted.location || '';
+      if (!location) {
+        const locationMeta = [
+          'meta[property="job:location"]',
+          'meta[name="job_location"]',
+          'meta[name="location"]'
+        ];
+        for (const selector of locationMeta) {
+          const node = doc.querySelector(selector);
+          const val = node ? (node.getAttribute('content') || '').trim() : '';
+          if (val) {
+            location = val;
+            break;
+          }
+        }
+      }
+      if (!location) {
+        location = extractLocationFromText(fullText);
       }
 
       const ogTitle = doc.querySelector('meta[property="og:title"]');
       const title = extracted.title || (ogTitle ? ogTitle.content : '');
       const company = extracted.company || '';
-      const location = extracted.location || '';
       if (postingDate || title || reqId || company || location) {
         return { title, postingDate, company, location, reqId };
       }
       return null;
     };
+
+    // DB careers pages are SPA pages; pull structured details from the public jobhtml API.
+    try {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.hostname.replace('www.', '').toLowerCase().includes('db.com')) {
+        const routeBlob = `${parsedUrl.pathname} ${decodeURIComponent(parsedUrl.hash || '')}`;
+        const dbIdMatch = routeBlob.match(/\/job\/([A-Za-z0-9_-]+)/i);
+        if (dbIdMatch && dbIdMatch[1]) {
+          const jobToken = dbIdMatch[1];
+          const dbApiUrl = `https://api-deutschebank.beesite.de/jobhtml/${encodeURIComponent(jobToken)}.json`;
+          const dbAttempts = [
+            dbApiUrl,
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(dbApiUrl)}`
+          ];
+          for (const endpoint of dbAttempts) {
+            try {
+              const resp = await fetch(endpoint, { redirect: 'follow' });
+              if (!resp.ok) continue;
+              const payload = await resp.json();
+              const dbParsed = parseDbApiPayload(payload);
+              if (dbParsed) return dbParsed;
+            } catch {
+              // continue to next endpoint
+            }
+          }
+        }
+      }
+    } catch {
+      // continue with generic extraction flow
+    }
 
     const attempts = [
       url,
@@ -766,9 +976,18 @@
       try {
         const resp = await fetch(attemptUrl, { redirect: 'follow' });
         if (!resp.ok) continue;
-        const html = await resp.text();
-        const parsed = parseHtmlForJobMeta(html);
+        const text = await resp.text();
+        const parsed = parseHtmlForJobMeta(text);
         if (parsed) return parsed;
+
+        // Some endpoints return JSON with HTML payload (common in SPA job platforms).
+        try {
+          const asJson = JSON.parse(text);
+          const dbParsed = parseDbApiPayload(asJson);
+          if (dbParsed) return dbParsed;
+        } catch {
+          // non-JSON response
+        }
       } catch {
         // continue trying next fallback endpoint
       }
@@ -783,6 +1002,7 @@
       const url = new URL(rawLink);
       const host = url.hostname.replace('www.', '').toLowerCase();
       const segments = url.pathname.split('/').filter(Boolean).map(s => decodeURIComponent(s));
+      const hashSegments = decodeURIComponent(url.hash || "").split('/').filter(Boolean).map((s) => decodeURIComponent(s));
 
       // Company from hostname
       let company = '';
@@ -790,6 +1010,7 @@
       else if (host.includes('siemens.com')) company = 'Siemens';
       else if (host.includes('bosch.com')) company = 'Bosch';
       else if (host.includes('bmw.com')) company = 'BMW';
+      else if (host.includes('db.com')) company = 'Deutsche Bank';
       else {
         const parts = host.split('.');
         company = parts.length >= 2 ? toTitleCase(parts[parts.length - 2].replace(/[-_]/g, ' ')) : '';
@@ -822,9 +1043,18 @@
         role = toTitleCase(segments[1].replace(/-/g, ' '));
         if (/^[0-9A-F]{10,}$/i.test(segments[2])) reqId = segments[2];
       }
+      // DB careers SPA hash route pattern: #/professional/job/{id}
+      else if (host.includes('db.com')) {
+        const allRoute = [...segments, ...hashSegments];
+        const jobIndex = allRoute.findIndex((part) => part.toLowerCase() === 'job');
+        if (jobIndex >= 0 && allRoute[jobIndex + 1]) {
+          reqId = allRoute[jobIndex + 1];
+        }
+        role = inferRoleFromUrlGeneric(url, allRoute);
+      }
       // Generic fallback
       else {
-        role = inferRoleFromUrlGeneric(url, segments);
+        role = inferRoleFromUrlGeneric(url, [...segments, ...hashSegments]);
       }
 
       const params = url.searchParams;
@@ -1601,6 +1831,9 @@
       setWeeklyGoal: (goal) => {
         state.currentWeeklyGoal = goal;
         renderGoal();
+      },
+      setAuthUser: (user) => {
+        updateAccountStatusUI(user);
       },
       init: loadUserDataAndRender
     };

@@ -35,6 +35,10 @@
     console.log('✅ Firebase ready');
 
     FirebaseAPI.auth.onAuthStateChanged((user) => {
+      if (window.JobHuntApp && typeof window.JobHuntApp.setAuthUser === 'function') {
+        window.JobHuntApp.setAuthUser(user || null);
+      }
+
       if (user) {
         console.log('👤 Signed in:', user.uid);
         currentUser = user;
