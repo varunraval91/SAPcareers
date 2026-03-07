@@ -120,7 +120,6 @@
         reqId: "6245A7060F154B81B933729607783B05",
         postingDate: "",
         stage: "Applied",
-        appliedDate: new Date().toISOString().slice(0, 10),
         deadline: "",
         contactType: "",
         contactName: "",
@@ -138,7 +137,6 @@
         reqId: "69190",
         postingDate: "2026-02-24",
         stage: "Applied",
-        appliedDate: new Date().toISOString().slice(0, 10),
         deadline: "",
         contactType: "",
         contactName: "",
@@ -337,7 +335,7 @@
             <input type="text" id="form-location" maxlength="120" value="${escapeAttr(app.location || '')}" placeholder="e.g. Walldorf, Munich" />
           </div>
           <div class="form-group">
-            <label for="form-req-id">Req ID</label>
+            <label for="form-req-id">Requisition ID</label>
             <input type="text" id="form-req-id" maxlength="120" value="${escapeAttr(app.reqId || '')}" placeholder="Requisition / Job ID" />
           </div>
         </div>
@@ -355,11 +353,7 @@
           </div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
-          <div class="form-group">
-            <label for="form-applied-date">Applied Date</label>
-            <input type="date" id="form-applied-date" value="${escapeAttr(app.appliedDate || '')}" />
-          </div>
+        <div style="display:grid;grid-template-columns:1fr;gap:1rem;">
           <div class="form-group">
             <label for="form-deadline">Self Deadline</label>
             <input type="date" id="form-deadline" value="${escapeAttr(app.deadline || '')}" />
@@ -621,7 +615,6 @@
     setFormValue("form-req-id", data.reqId, force);
     setFormValue("form-posting-date", data.postingDate, force);
     setFormValue("form-stage", data.stage, force);
-    setFormValue("form-applied-date", data.appliedDate, force);
     setFormValue("form-deadline", data.deadline, force);
     setFormValue("form-contact-type", data.contactType, force);
     setFormValue("form-contact-name", data.contactName, force);
@@ -769,7 +762,6 @@
     const typedReqId = getValue("form-req-id").trim();
     const typedPostingDate = getValue("form-posting-date");
     const stage = getValue("form-stage") || "Applied";
-    const appliedDate = getValue("form-applied-date");
     const deadline = getValue("form-deadline");
     const contactType = getValue("form-contact-type");
     const contactName = getValue("form-contact-name").trim();
@@ -796,7 +788,6 @@
       reqId,
       postingDate,
       stage,
-      appliedDate,
       deadline,
       contactType,
       contactName,
@@ -943,7 +934,6 @@
     card.className = `card urgent-${urgency}`;
 
     const postingText = app.postingDate ? formatDate(app.postingDate) : "-";
-    const appliedText = app.appliedDate ? formatDate(app.appliedDate) : "-";
     const deadlineText = app.deadline ? formatDate(app.deadline) : "-";
 
     card.innerHTML = `
@@ -955,10 +945,9 @@
       </div>
       <div class="card-meta">
         <span class="card-meta-item">Post: ${postingText}</span>
-        <span class="card-meta-item">Applied: ${appliedText}</span>
         <span class="card-meta-item">Deadline: ${deadlineText}</span>
       </div>
-      ${app.reqId ? `<div class="card-meta-item">Req ID: ${escapeHtml(app.reqId)}</div>` : ""}
+      ${app.reqId ? `<div class="card-meta-item">Requisition ID: ${escapeHtml(app.reqId)}</div>` : ""}
       ${app.contactType || app.contactName ? `<div class="card-meta-item">Contact: ${escapeHtml([app.contactType, app.contactName].filter(Boolean).join(" - "))}</div>` : ""}
       ${app.link ? `<a href="${escapeAttr(app.link)}" target="_blank" rel="noopener noreferrer">Open Job Link</a>` : ""}
       ${app.notes ? `<div class="card-notes">${escapeHtml(app.notes)}</div>` : ""}
@@ -1179,7 +1168,6 @@
       "Job Link",
       "Job Posting Date",
       "Stage",
-      "Applied Date",
       "Self Deadline",
       "Contact Type",
       "Contact Name",
@@ -1194,7 +1182,6 @@
       app.link || "",
       app.postingDate || "",
       app.stage || "",
-      app.appliedDate || "",
       app.deadline || "",
       app.contactType || "",
       app.contactName || "",
@@ -1355,7 +1342,6 @@
       reqId: "",
       postingDate: "",
       stage: "Applied",
-      appliedDate: "",
       deadline: "",
       contactType: "",
       contactName: "",
