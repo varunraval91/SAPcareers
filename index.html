@@ -4,9 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Job and Internship Application Tracking Pipeline</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Style+Script&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@400;500;700;800;900&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/redesign.css" />
   <link rel="stylesheet" href="css/auth-screen-styles.css" />
@@ -17,64 +15,124 @@
   <!-- LOGIN SCREEN (FIRST PAGE)              -->
   <!-- ═══════════════════════════════════════ -->
   <section id="auth-screen" role="region" aria-label="Sign in to continue">
+    <button type="button" class="auth-theme-toggle" id="auth-theme-toggle" aria-label="Toggle theme">
+      <span id="auth-theme-icon">🌙</span>
+    </button>
+
     <div class="auth-container">
-      <div class="auth-bg-decoration" aria-hidden="true"></div>
-      <div class="auth-card">
-        <div class="auth-header">
-          <div class="auth-logo">
-            <svg class="auth-logo-icon" viewBox="0 0 120 140" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="authLogoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" style="stop-color:#6C5CE7;stop-opacity:1" />
-                  <stop offset="100%" style="stop-color:#00B894;stop-opacity:1" />
-                </linearGradient>
-                <linearGradient id="authFrameGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" style="stop-color:#00B894;stop-opacity:0.8" />
-                  <stop offset="100%" style="stop-color:#00B894;stop-opacity:0.2" />
-                </linearGradient>
-              </defs>
-              <!-- Decorative arc frame -->
-              <path d="M 60,15 A 45,45 0 1,1 50,103" fill="none" stroke="url(#authFrameGradient)" stroke-width="2" stroke-linecap="round" stroke-dasharray="1,2.5" />
-              <!-- Briefcase -->
-              <rect x="45" y="65" width="30" height="18" rx="2" fill="#6C5CE7" />
-              <path d="M 54,65 L 54,61 Q 60,58 66,61 L 66,65" fill="none" stroke="#6C5CE7" stroke-width="1.5" />
-              <rect x="58" y="72" width="4" height="2" rx="0.5" fill="#FFFFFF" opacity="0.5" />
-              <!-- Upward Arrow -->
-              <path d="M 60,25 L 75,45 L 65,45 L 65,65 L 55,65 L 55,45 L 45,45 Z" fill="url(#authLogoGradient)" />
-              <path d="M 60,28 L 62,33 L 62,40 L 58,40 L 58,33 Z" fill="#FFFFFF" opacity="0.8" />
-              <!-- Pin marker -->
-              <circle cx="50" cy="48" r="1.5" fill="#00B894" />
-              <path d="M 50,51 L 49,49 L 51,49 Z" fill="#00B894" />
-              <!-- Document -->
-              <rect x="68" y="47" width="3" height="4" fill="#FFFFFF" />
-              <line x1="68.5" y1="48" x2="70.5" y2="48" stroke="#6C5CE7" stroke-width="0.3" />
-              <line x1="68.5" y1="49" x2="70.5" y2="49" stroke="#6C5CE7" stroke-width="0.3" />
-              <!-- Text -->
-              <text x="60" y="100" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#2D3436" text-anchor="middle" letter-spacing="0.5">JOB TRACKER</text>
-              <text x="60" y="110" font-family="Arial, sans-serif" font-size="4.5" fill="#00B894" text-anchor="middle" letter-spacing="1.2">APPLICATION PIPELINE</text>
-            </svg>
+      <div class="auth-left-panel">
+        <div class="auth-blob auth-blob-1" aria-hidden="true"></div>
+        <div class="auth-blob auth-blob-2" aria-hidden="true"></div>
+        <div class="auth-blob auth-blob-3" aria-hidden="true"></div>
+
+        <div class="auth-orbit" aria-hidden="true">
+          <div class="orbit-ring orbit-ring-outer"><span class="orbit-dot orbit-dot-outer"></span></div>
+          <div class="orbit-ring orbit-ring-inner"><span class="orbit-dot orbit-dot-inner"></span></div>
+          <div class="orbit-pulse-ring"></div>
+          <div class="orbit-static-dots">
+            <span class="s-dot s1"></span>
+            <span class="s-dot s2"></span>
+            <span class="s-dot s3"></span>
+            <span class="s-dot s4"></span>
+            <span class="s-dot s5"></span>
+            <span class="s-dot s6"></span>
           </div>
-          <h1 class="auth-title">Job and Internship Application Tracking Pipeline</h1>
-          <p class="auth-subtitle">Sign in to access your dashboard, KPI cards, and kanban board.</p>
+          <div class="orbit-center">
+            <div class="rocket">
+              <div class="rocket-tip"></div>
+              <div class="rocket-body"></div>
+              <div class="rocket-base"></div>
+            </div>
+          </div>
         </div>
 
-        <div class="auth-quote" id="auth-quote">"Small daily progress leads to extraordinary career outcomes."</div>
+        <div class="auth-brand-block">
+          <p class="auth-eyebrow">Track every move</p>
+          <h1 class="auth-hero">Job Tracker</h1>
+          <p class="auth-pipeline-pill"><span class="pill-dot"></span>Application Pipeline</p>
+        </div>
 
-        <form id="auth-login-form" class="auth-form" autocomplete="on">
-          <label for="auth-email-input">Email</label>
-          <input id="auth-email-input" type="email" required placeholder="you@example.com" autocomplete="email" />
+        <div class="auth-mini-pipeline" aria-label="Live pipeline">
+          <p class="pipeline-header">Live pipeline</p>
+          <div class="pipeline-row" style="--bar:var(--c-wishlist);--target:100%;--idx:0;">
+            <span class="row-dot"></span><span class="row-name">Wishlist</span><span class="row-track"><span class="row-fill"></span></span><span class="row-count">12</span>
+          </div>
+          <div class="pipeline-row" style="--bar:var(--c-applied);--target:85%;--idx:1;">
+            <span class="row-dot"></span><span class="row-name">Applied</span><span class="row-track"><span class="row-fill"></span></span><span class="row-count">13</span>
+          </div>
+          <div class="pipeline-row" style="--bar:var(--c-oa);--target:42%;--idx:2;">
+            <span class="row-dot"></span><span class="row-name">OA/Test</span><span class="row-track"><span class="row-fill"></span></span><span class="row-count">5</span>
+          </div>
+          <div class="pipeline-row" style="--bar:var(--c-interview);--target:50%;--idx:3;">
+            <span class="row-dot"></span><span class="row-name">Interview</span><span class="row-track"><span class="row-fill"></span></span><span class="row-count">6</span>
+          </div>
+          <div class="pipeline-row" style="--bar:var(--c-rejected);--target:42%;--idx:4;">
+            <span class="row-dot"></span><span class="row-name">Rejected</span><span class="row-track"><span class="row-fill"></span></span><span class="row-count">5</span>
+          </div>
+          <div class="pipeline-row" style="--bar:var(--c-offer);--target:25%;--idx:5;">
+            <span class="row-dot"></span><span class="row-name">Offer</span><span class="row-track"><span class="row-fill"></span></span><span class="row-count">3</span>
+          </div>
+        </div>
 
-          <label for="auth-password-input">Password</label>
-          <input id="auth-password-input" type="password" required minlength="6" placeholder="Enter password" autocomplete="current-password" />
+        <p class="auth-left-quote" id="auth-quote">Small daily progress leads to extraordinary career outcomes.</p>
+      </div>
 
-          <div id="auth-error" class="auth-error hidden" role="alert"></div>
-          <button id="auth-login-btn" type="submit" class="btn-auth">Sign In</button>
-        </form>
+      <div class="auth-right-panel">
+        <div class="auth-right-accent" aria-hidden="true"></div>
+        <div class="auth-card">
+          <form id="auth-login-form" class="auth-form" autocomplete="on">
+            <p class="auth-status-chip"><span class="chip-dot"></span>Sign in to continue</p>
 
-        <p class="auth-footer">
-          <span class="footer-icon">🔒</span>
-          Secure access required. Contact admin if account is not created yet.
-        </p>
+            <div class="auth-header">
+              <h2 class="auth-title">Welcome back,<br />Varun.</h2>
+              <p class="auth-subtitle">Your pipeline and kanban board are waiting for you.</p>
+            </div>
+
+            <label for="auth-email-input">Email</label>
+            <div class="auth-input-wrap">
+              <span class="auth-input-icon" aria-hidden="true">✉</span>
+              <input id="auth-email-input" type="email" required placeholder="you@example.com" autocomplete="email" />
+            </div>
+
+            <label for="auth-password-input">Password</label>
+            <div class="auth-input-wrap">
+              <span class="auth-input-icon" aria-hidden="true">🔑</span>
+              <input id="auth-password-input" type="password" required minlength="6" placeholder="Enter password" autocomplete="current-password" />
+            </div>
+
+            <div id="auth-error" class="auth-error hidden" role="alert"></div>
+
+            <button id="auth-login-btn" type="submit" class="btn-auth">
+              <span>Sign in</span>
+              <span class="btn-auth-arrow" aria-hidden="true">→</span>
+            </button>
+
+            <button id="auth-guest-btn" type="button" class="btn-auth btn-auth-guest">
+              <span>Continue as Guest</span>
+            </button>
+
+            <p class="auth-divider">About</p>
+
+            <div class="auth-about-card" aria-label="Profile summary">
+              <div class="auth-about-top">
+                <div class="auth-avatar" aria-hidden="true">VR</div>
+                <div>
+                  <p class="auth-name">Varun Raval</p>
+                  <p class="auth-role">SAP Engineering & Analytics</p>
+                </div>
+              </div>
+
+              <div class="auth-about-rows">
+                <p><span class="k">University</span><span class="v">Hochschule Fresenius Heidelberg</span></p>
+                <p><span class="k">Focus</span><span class="v">Practical JavaScript projects</span></p>
+                <div class="about-sep" aria-hidden="true"></div>
+                <p><span class="k">Purpose</span><span class="v">Track applications, deadlines, and progress in one place.</span></p>
+              </div>
+            </div>
+          </form>
+
+          <p class="auth-footer"><span class="footer-icon" aria-hidden="true">🔐</span>Access is invite-only. Contact admin if you don't have an account.</p>
+        </div>
       </div>
     </div>
   </section>
@@ -125,33 +183,42 @@
         </svg>
       </div>
       <nav class="sidebar-nav">
-        <a href="#" class="nav-item active" data-view="dashboard" title="Dashboard">
+        <a href="#" id="dashboardBtn" class="nav-item active" data-view="dashboard" title="Dashboard">
           <span class="nav-icon">▦</span> <span class="nav-label">Dashboard</span>
         </a>
-        <a href="#" class="nav-item" data-view="analytics" id="analytics-nav-btn" title="Analytics">
-          <span class="nav-icon">◍</span> <span class="nav-label">Analytics</span>
-        </a>
+        <button type="button" class="nav-item sb-icon" id="analyticsBtn" aria-label="Analytics" title="Analytics">
+          <span class="nav-icon">◍</span>
+          <span class="nav-label">Analytics</span>
+        </button>
       </nav>
       <div class="sidebar-footer">
         <div id="account-status" class="account-status" title="Current authentication status">Signed out</div>
         <button id="theme-toggle" aria-label="Toggle theme">
           <span id="theme-icon">☀</span>
         </button>
-        <button id="account-logout-btn" title="Sign out from your account">
-          ⇥ Logout
-        </button>
         <button id="import-data-btn" title="Import applications from CSV/Excel">
-          ↑ Import CSV/Excel
+           <span class="utility-icon" aria-hidden="true">↑</span>
+           <span class="utility-label">Import CSV</span>
         </button>
         <input id="import-file-input" type="file" accept=".csv,.xlsx,.xls" class="hidden" />
         <button id="export-csv-btn" title="Export all data as CSV">
-          ↓ Export CSV
+           <span class="utility-icon" aria-hidden="true">↓</span>
+           <span class="utility-label">Export CSV</span>
         </button>
+        <button id="reset-guest-btn" class="hidden" title="Clear guest data from this browser">
+          <span class="utility-icon" aria-hidden="true">⟲</span>
+          <span class="utility-label">Reset Guest Data</span>
+        </button>
+          <button id="account-logout-btn" title="Sign out from your account">
+            <span class="utility-icon" aria-hidden="true">⇥</span>
+            <span class="utility-label">Logout</span>
+          </button>
       </div>
     </aside>
 
     <!-- MAIN CONTENT -->
     <main class="main-content" id="main-content">
+      <div id="kanbanView">
 
       <!-- ─── TOP BAR ─── -->
       <header class="topbar">
@@ -173,7 +240,6 @@
             <span>Weekly Goal</span>
             <div class="goal-tools">
               <button class="goal-edit-btn" id="goal-edit-btn" aria-label="Edit weekly goal">✎</button>
-              <button class="analytics-toggle-btn" id="analytics-toggle-btn" aria-label="Toggle analytics" title="Toggle analytics">📈</button>
             </div>
           </div>
           <div class="goal-progress-container">
@@ -183,83 +249,44 @@
             <div class="goal-text" id="goal-text">0 / 10 applications this week</div>
           </div>
         </div>
-      </section>
 
-      <section class="analytics-panel hidden" id="analytics-panel" aria-label="Analytics insights">
-        <div class="analytics-header">
-          <h2>Analytics</h2>
-          <div class="analytics-controls">
-            <label for="analytics-metric-select">Regression Metric</label>
-            <select id="analytics-metric-select">
-              <option value="stage">Status of applied jobs</option>
-              <option value="company">Companies and number of applications</option>
-            </select>
-          </div>
-        </div>
-        <div class="analytics-grid">
-          <article class="analytics-card analytics-card-wide">
-            <h3>Regression Insights</h3>
-            <canvas id="analytics-regression-chart" aria-label="Regression chart"></canvas>
-          </article>
-          <article class="analytics-card">
-            <h3>Stage Distribution</h3>
-            <canvas id="analytics-stage-chart" aria-label="Stage distribution chart"></canvas>
-          </article>
-          <article class="analytics-card">
-            <h3>Company Breakdown</h3>
-            <canvas id="analytics-company-chart" aria-label="Company stacked chart"></canvas>
-          </article>
-          <article class="analytics-card">
-            <h3>Success Rate Trends</h3>
-            <canvas id="analytics-trends-chart" aria-label="Application trends chart"></canvas>
-          </article>
-        </div>
+        <!-- ─── MOTIVATIONAL QUOTE ─── -->
+        <section class="quote-banner">
+          <div id="motivational-quote-container" class="quote-text"></div>
+        </section>
       </section>
 
       <section class="insights-container" aria-label="Summary, quote and search">
         <!-- ─── STATS BAR ─── -->
         <section class="stats-bar" id="stats-bar" aria-label="Application statistics">
-          <div class="stat-tile" data-filter="all" tabindex="0" role="button" aria-label="Total applications">
-            <div class="stat-icon">📋</div>
-            <div class="stat-value" id="stat-total">0</div>
-            <div class="stat-label">Total</div>
-            <div class="stat-accent" style="background: var(--accent-primary)"></div>
+          <button type="button" class="stat-tile stage-wishlist" data-filter="Wishlist" aria-label="Wishlist">
+            <span class="stat-value" id="stat-total">0</span>
+            <span class="stat-label">Wishlist</span>
+          </button>
+          <button type="button" class="stat-tile stage-applied" data-filter="Applied" aria-label="Applied">
+            <span class="stat-value" id="stat-applied">0</span>
+            <span class="stat-label">Applied</span>
+          </button>
+          <button type="button" class="stat-tile stage-oa" data-filter="OA/Test" aria-label="OA/Test">
+            <span class="stat-value" id="stat-interview">0</span>
+            <span class="stat-label">OA/Test</span>
+          </button>
+          <button type="button" class="stat-tile stage-interview" data-filter="Interview" aria-label="Interview">
+            <span class="stat-value" id="stat-offers">0</span>
+            <span class="stat-label">Interview</span>
+          </button>
+          <button type="button" class="stat-tile stage-rejected" data-filter="Rejected" aria-label="Rejected">
+            <span class="stat-value" id="stat-followup">0</span>
+            <span class="stat-label">Rejected</span>
+          </button>
+          <button type="button" class="stat-tile stage-offer" data-filter="Offer" aria-label="Offer">
+            <span class="stat-value" id="stat-response">0</span>
+            <span class="stat-label">Offer</span>
+          </button>
+          <div class="stat-tile stage-rate" aria-label="Response Rate">
+            <span class="stat-value" id="stat-rate">0%</span>
+            <span class="stat-label">Response Rate</span>
           </div>
-          <div class="stat-tile" data-filter="Applied" tabindex="0" role="button" aria-label="Applied">
-            <div class="stat-icon">📤</div>
-            <div class="stat-value" id="stat-applied">0</div>
-            <div class="stat-label">Applied</div>
-            <div class="stat-accent" style="background: var(--accent-info)"></div>
-          </div>
-          <div class="stat-tile" data-filter="Interview" tabindex="0" role="button" aria-label="Interviews">
-            <div class="stat-icon">🎯</div>
-            <div class="stat-value" id="stat-interview">0</div>
-            <div class="stat-label">Interview</div>
-            <div class="stat-accent" style="background: var(--accent-warning)"></div>
-          </div>
-          <div class="stat-tile" data-filter="Offer" tabindex="0" role="button" aria-label="Offers">
-            <div class="stat-icon">🏆</div>
-            <div class="stat-value" id="stat-offers">0</div>
-            <div class="stat-label">Offers</div>
-            <div class="stat-accent" style="background: var(--accent-success)"></div>
-          </div>
-          <div class="stat-tile" data-filter="followup" tabindex="0" role="button" aria-label="Follow-ups due">
-            <div class="stat-icon">⏰</div>
-            <div class="stat-value" id="stat-followup">0</div>
-            <div class="stat-label">Follow-up Due</div>
-            <div class="stat-accent" style="background: var(--accent-secondary)"></div>
-          </div>
-          <div class="stat-tile" data-filter="responserate" tabindex="0" role="button" aria-label="Response rate">
-            <div class="stat-icon">📊</div>
-            <div class="stat-value" id="stat-response">0%</div>
-            <div class="stat-label">Response Rate</div>
-            <div class="stat-accent" style="background: var(--accent-primary)"></div>
-          </div>
-        </section>
-
-        <!-- ─── MOTIVATIONAL QUOTE ─── -->
-        <section class="quote-banner">
-          <div id="motivational-quote-container" class="quote-text"></div>
         </section>
 
         <!-- ─── SEARCH + FILTER TOOLBAR ─── -->
@@ -275,6 +302,8 @@
               autocomplete="off"
             />
           </div>
+          <div class="company-shortcuts" id="company-shortcuts" role="group" aria-label="Company shortcuts"></div>
+          <span class="filter-by-label">Filter by</span>
           <div class="filter-chips" id="filter-chips" role="group" aria-label="Filter by stage">
             <button class="chip chip-active" data-stage="all">All</button>
             <button class="chip" data-stage="Wishlist">Wishlist</button>
@@ -298,14 +327,148 @@
 
         <!-- Active filter indicator -->
         <div class="active-filter-bar" id="active-filter-bar" hidden>
-          Filtering: <span id="active-filter-label"></span>
-          <button id="clear-filter-btn" aria-label="Clear filter">✕ Clear</button>
+          <span id="active-filter-label"></span>
         </div>
       </section>
 
       <!-- ─── KANBAN BOARD ─── -->
       <div class="kanban-board" id="kanban-board" role="region" aria-label="Application pipeline board">
         <!-- 6 columns injected by JS -->
+      </div>
+
+      </div>
+
+      <div id="analyticsView" style="display:none;">
+        <div class="an-topbar">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="an-title">Analytics</div>
+            <div class="an-count-badge" id="anTopCount">0</div>
+          </div>
+
+          <div class="an-date-group">
+            <div class="an-date-field">
+              <label class="an-date-label" for="anFrom">From</label>
+              <input class="an-date-input" id="anFrom" type="date" />
+            </div>
+            <div class="an-date-field">
+              <label class="an-date-label" for="anTo">To</label>
+              <input class="an-date-input" id="anTo" type="date" />
+            </div>
+          </div>
+
+          <div class="an-topbar-right">
+            <button class="an-btn" id="anExportBtn" type="button">↓ Export CSV</button>
+            <button class="an-btn an-btn-sm" id="anRefreshBtn" type="button">⟳</button>
+          </div>
+        </div>
+
+        <div class="an-body">
+          <aside class="an-filter-sb">
+            <div class="an-sb-head">
+              <div class="an-sb-title">Filters</div>
+              <button class="an-sb-clear" id="anClearFiltersBtn" type="button">✕ Clear all</button>
+            </div>
+
+            <div class="an-active-chips">
+              <div class="an-chips-lbl">Active Filters</div>
+              <div id="anActiveChips"></div>
+            </div>
+
+            <div class="an-filter-section">
+              <div class="an-fs-label">Status <span id="anStatusCount">6</span></div>
+              <div class="an-status-checks" id="anStatusChecks">
+                <label class="an-s-check" data-status="W"><input type="checkbox" checked /><span class="an-s-dot" style="background:#7c6af7"></span><span class="an-s-name">Wishlist</span><span class="an-s-bar"><span class="an-s-fill" data-w="100" style="background:#7c6af7;width:0"></span></span><span class="an-s-count">12</span></label>
+                <label class="an-s-check" data-status="A"><input type="checkbox" checked /><span class="an-s-dot" style="background:#4da8f7"></span><span class="an-s-name">Applied</span><span class="an-s-bar"><span class="an-s-fill" data-w="85" style="background:#4da8f7;width:0"></span></span><span class="an-s-count">13</span></label>
+                <label class="an-s-check" data-status="O"><input type="checkbox" checked /><span class="an-s-dot" style="background:#f7c26a"></span><span class="an-s-name">OA/Test</span><span class="an-s-bar"><span class="an-s-fill" data-w="42" style="background:#f7c26a;width:0"></span></span><span class="an-s-count">5</span></label>
+                <label class="an-s-check" data-status="I"><input type="checkbox" checked /><span class="an-s-dot" style="background:#4df7b8"></span><span class="an-s-name">Interview</span><span class="an-s-bar"><span class="an-s-fill" data-w="50" style="background:#4df7b8;width:0"></span></span><span class="an-s-count">4</span></label>
+                <label class="an-s-check" data-status="R"><input type="checkbox" checked /><span class="an-s-dot" style="background:#f7705a"></span><span class="an-s-name">Rejected</span><span class="an-s-bar"><span class="an-s-fill" data-w="42" style="background:#f7705a;width:0"></span></span><span class="an-s-count">5</span></label>
+                <label class="an-s-check" data-status="F"><input type="checkbox" checked /><span class="an-s-dot" style="background:#a8f740"></span><span class="an-s-name">Offer</span><span class="an-s-bar"><span class="an-s-fill" data-w="42" style="background:#a8f740;width:0"></span></span><span class="an-s-count">5</span></label>
+              </div>
+            </div>
+
+            <div class="an-filter-section">
+              <div class="an-fs-label">Company</div>
+              <input id="anCompany" class="an-f-input" placeholder="e.g. SAP, Siemens..." />
+              <div class="an-tag-cloud">
+                <button class="an-tag" type="button" onclick="an_quickFilter('company','SAP')">SAP</button>
+                <button class="an-tag" type="button" onclick="an_quickFilter('company','Siemens')">Siemens</button>
+                <button class="an-tag" type="button" onclick="an_quickFilter('company','DHL')">DHL</button>
+                <button class="an-tag" type="button" onclick="an_quickFilter('company','Bosch')">Bosch</button>
+                <button class="an-tag" type="button" onclick="an_quickFilter('company','BMW')">BMW</button>
+              </div>
+            </div>
+
+            <div class="an-filter-section">
+              <div class="an-fs-label">Location</div>
+              <input id="anLocation" class="an-f-input" placeholder="e.g. Walldorf, Munich..." />
+              <div class="an-tag-cloud">
+                <button class="an-tag" type="button" onclick="an_quickFilter('location','Walldorf')">Walldorf</button>
+                <button class="an-tag" type="button" onclick="an_quickFilter('location','Munich')">Munich</button>
+                <button class="an-tag" type="button" onclick="an_quickFilter('location','Karlsruhe')">Karlsruhe</button>
+                <button class="an-tag" type="button" onclick="an_quickFilter('location','Berlin')">Berlin</button>
+                <button class="an-tag" type="button" onclick="an_quickFilter('location','Stuttgart')">Stuttgart</button>
+              </div>
+            </div>
+
+            <div class="an-filter-section">
+              <div class="an-fs-label">Process keyword</div>
+              <input id="anKeyword" class="an-f-input" placeholder="e.g. Phase 2, English..." />
+              <div class="an-tag-cloud">
+                <button class="an-tag" type="button" onclick="an_quickFilter('keyword','Phase 1')">Phase 1</button>
+                <button class="an-tag" type="button" onclick="an_quickFilter('keyword','Phase 2')">Phase 2</button>
+                <button class="an-tag" type="button" onclick="an_quickFilter('keyword','Phase 3')">Phase 3</button>
+                <button class="an-tag" type="button" onclick="an_quickFilter('keyword','Phase 4')">Phase 4</button>
+                <button class="an-tag" type="button" onclick="an_quickFilter('keyword','English')">English</button>
+                <button class="an-tag" type="button" onclick="an_quickFilter('keyword','Master thesis')">Master thesis</button>
+              </div>
+            </div>
+
+            <div class="an-sb-apply">
+              <button class="an-apply-btn" id="anApplyFiltersBtn" type="button">Apply filters</button>
+            </div>
+          </aside>
+
+          <section class="an-main">
+            <div class="an-topbar" style="height:auto;padding:12px 18px;border-bottom:0;background:transparent;">
+              <div class="an-date-field" style="width:100%;">
+                <label class="an-date-label" for="anSearch">Search</label>
+                <input class="an-f-input" id="anSearch" placeholder="Search company, role, location, keywords, id..." />
+              </div>
+            </div>
+
+            <div class="an-stats-row">
+              <article class="an-stat-card" style="border-left-color:var(--accent)"><div class="an-stat-ey">Total Applications</div><div class="an-stat-num" id="anStatTotal">0</div><div class="an-stat-delta">across all stages</div></article>
+              <article class="an-stat-card" style="border-left-color:#4df7b8"><div class="an-stat-ey">Response Rate</div><div class="an-stat-num" id="anStatRate">0%</div><div class="an-stat-delta">+4% vs last month</div></article>
+              <article class="an-stat-card" style="border-left-color:#f7c26a"><div class="an-stat-ey">Active Pipeline</div><div class="an-stat-num" id="anStatActive">0</div><div class="an-stat-delta">in progress right now</div></article>
+              <article class="an-stat-card" style="border-left-color:#a8f740"><div class="an-stat-ey">Offers Received</div><div class="an-stat-num" id="anStatOffers" style="color:#a8f740">0</div><div class="an-stat-delta" id="anStatOfferRate">0% offer rate</div></article>
+            </div>
+
+            <div class="an-charts-row">
+              <article class="an-chart-card">
+                <div class="an-chart-head"><div class="an-chart-title">Pipeline Breakdown</div><div class="an-chart-sub">Applications by stage</div></div>
+                <div class="an-chart-wrap"><canvas id="anBarChart"></canvas></div>
+              </article>
+              <article class="an-chart-card">
+                <div class="an-chart-head"><div class="an-chart-title">Status Distribution</div><div class="an-chart-sub">by count</div></div>
+                <div class="an-chart-wrap"><canvas id="anDonutChart"></canvas></div>
+              </article>
+            </div>
+
+            <article class="an-table-card">
+              <div class="an-table-subhead">
+                <div style="display:flex;align-items:center;gap:8px;"><div class="an-table-title">Applications</div><div class="an-count-badge" id="anTableCount">0</div></div>
+                <div style="display:flex;gap:8px;"><select id="anSort" class="an-sel"><option value="company">Company A-Z</option><option value="status">Status</option><option value="deadline">Deadline</option></select><button class="an-btn an-btn-sm" type="button">Columns</button></div>
+              </div>
+              <div class="an-tbl-wrap">
+                <table class="an-table">
+                  <thead><tr><th>☐</th><th>Company</th><th>Role</th><th>Location</th><th>Status</th><th>Keywords</th><th>Deadline</th><th>ID</th><th>Action</th></tr></thead>
+                  <tbody id="anTableBody"></tbody>
+                </table>
+              </div>
+              <div class="an-empty" id="anEmpty"><div class="an-empty-title">No applications match</div><div class="an-empty-sub">Try adjusting your filters.</div></div>
+            </article>
+          </section>
+        </div>
       </div>
 
     </main>

@@ -2,19 +2,19 @@
   const STORAGE_KEY = "job_hunt_hq_applications";
   const GOAL_KEY = "job_hunt_hq_weekly_goal";
   const THEME_KEY = "job_hunt_hq_theme";
-  const ANALYTICS_KEY = "job_hunt_hq_analytics_open";
+  const THEME_EVENT = "jobhunt-theme-changed";
 
   const STAGES = ["Wishlist", "Applied", "OA/Test", "Interview", "Rejected", "Offer"];
+  const DEFAULT_COMPANY_SHORTCUTS = ["SAP", "Siemens", "DHL"];
+  const SCROLL_TOP_THRESHOLD = 300;
 
     // Firebase state
     let currentUserId = null;
     let useFirebase = false;
 
-  const charts = {
-    regression: null,
-    stage: null,
-    company: null,
-    trends: null
+  const anCharts = {
+    bar: null,
+    donut: null
   };
 
   const quoteState = {
@@ -54,15 +54,43 @@
     }
   }
 
+  function safeStorageRemove(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // Storage may be blocked; keep app functional without persistence.
+    }
+  }
+
+  function broadcastTheme(theme) {
+    window.dispatchEvent(new CustomEvent(THEME_EVENT, {
+      detail: { theme }
+    }));
+  }
+
   const state = {
     applications: [],
     currentWeeklyGoal: parseInt(safeStorageGet(GOAL_KEY), 10) || 10,
     currentFilter: "all",
+    currentCompanyFilter: "all",
     currentSort: "deadline-asc",
     searchQuery: "",
     editingId: null,
-    theme: safeStorageGet(THEME_KEY) || "light",
-    analyticsExpanded: safeStorageGet(ANALYTICS_KEY) !== "false"
+    theme: safeStorageGet(THEME_KEY) || "light"
+  };
+
+  const anState = {
+    initialized: false,
+    isOpen: false,
+    from: "",
+    to: "",
+    company: "",
+    location: "",
+    keyword: "",
+    search: "",
+    statuses: new Set(["W", "A", "O", "I", "R", "F"]),
+    sort: "deadline",
+    filtered: []
   };
 
   const DOM = {
@@ -72,6 +100,7 @@
     themeToggle: document.getElementById("theme-toggle"),
     themeIcon: document.getElementById("theme-icon"),
     accountStatus: document.getElementById("account-status"),
+    resetGuestBtn: document.getElementById("reset-guest-btn"),
     accountLogoutBtn: document.getElementById("account-logout-btn"),
     importBtn: document.getElementById("import-data-btn"),
     importFileInput: document.getElementById("import-file-input"),
@@ -81,25 +110,48 @@
     goalBarFill: document.getElementById("goal-bar-fill"),
     goalText: document.getElementById("goal-text"),
     goalEditBtn: document.getElementById("goal-edit-btn"),
-    analyticsToggleBtn: document.getElementById("analytics-toggle-btn"),
-    analyticsNavBtn: document.getElementById("analytics-nav-btn"),
-    analyticsPanel: document.getElementById("analytics-panel"),
-    analyticsMetricSelect: document.getElementById("analytics-metric-select"),
-    analyticsRegressionCanvas: document.getElementById("analytics-regression-chart"),
-    analyticsStageCanvas: document.getElementById("analytics-stage-chart"),
-    analyticsCompanyCanvas: document.getElementById("analytics-company-chart"),
-    analyticsTrendsCanvas: document.getElementById("analytics-trends-chart"),
+    analyticsBtn: document.getElementById("analyticsBtn"),
+    dashboardBtn: document.getElementById("dashboardBtn"),
+    kanbanView: document.getElementById("kanbanView"),
+    analyticsView: document.getElementById("analyticsView"),
+    anTopCount: document.getElementById("anTopCount"),
+    anDateFrom: document.getElementById("anFrom"),
+    anDateTo: document.getElementById("anTo"),
+    anExportBtn: document.getElementById("anExportBtn"),
+    anRefreshBtn: document.getElementById("anRefreshBtn"),
+    anStatusChecks: document.getElementById("anStatusChecks"),
+    anCompany: document.getElementById("anCompany"),
+    anLocation: document.getElementById("anLocation"),
+    anKeyword: document.getElementById("anKeyword"),
+    anApplyFiltersBtn: document.getElementById("anApplyFiltersBtn"),
+    anClearFiltersBtn: document.getElementById("anClearFiltersBtn"),
+    anStatusCount: document.getElementById("anStatusCount"),
+    anActiveChips: document.getElementById("anActiveChips"),
+    anSearch: document.getElementById("anSearch"),
+    anSort: document.getElementById("anSort"),
+    anTableBody: document.getElementById("anTableBody"),
+    anTableCount: document.getElementById("anTableCount"),
+    anEmpty: document.getElementById("anEmpty"),
+    anStatTotal: document.getElementById("anStatTotal"),
+    anStatRate: document.getElementById("anStatRate"),
+    anStatActive: document.getElementById("anStatActive"),
+    anStatOffers: document.getElementById("anStatOffers"),
+    anStatOfferRate: document.getElementById("anStatOfferRate"),
+    anBarChart: document.getElementById("anBarChart"),
+    anDonutChart: document.getElementById("anDonutChart"),
     statTotal: document.getElementById("stat-total"),
     statApplied: document.getElementById("stat-applied"),
     statInterview: document.getElementById("stat-interview"),
     statOffers: document.getElementById("stat-offers"),
     statFollowup: document.getElementById("stat-followup"),
     statResponse: document.getElementById("stat-response"),
+    statRate: document.getElementById("stat-rate"),
     searchInput: document.getElementById("search-input"),
     sortSelect: document.getElementById("sort-select"),
     activeFilterBar: document.getElementById("active-filter-bar"),
     activeFilterLabel: document.getElementById("active-filter-label"),
     clearFilterBtn: document.getElementById("clear-filter-btn"),
+    companyShortcuts: document.getElementById("company-shortcuts"),
     kanbanBoard: document.getElementById("kanban-board"),
     scrollToTopBtn: document.getElementById("scroll-to-top-btn")
   };
@@ -115,14 +167,32 @@
         console.log('✅ Firebase mode – waiting for auth data');
       } else {
         console.log('⚠️ Offline mode (localStorage)');
+        state.applications = loadApplications();
       }
       setupTheme();
       bindEvents();
+      addListener(window, "storage", (event) => {
+        if (event.key !== THEME_KEY || !event.newValue) {
+          return;
+        }
+        if (event.newValue !== state.theme) {
+          state.theme = event.newValue;
+          setupTheme();
+        }
+      });
+      addListener(window, THEME_EVENT, (event) => {
+        const nextTheme = event && event.detail ? event.detail.theme : "";
+        if ((nextTheme === "light" || nextTheme === "dark") && nextTheme !== state.theme) {
+          state.theme = nextTheme;
+          setupTheme();
+        }
+      });
       const currentUser = (typeof FirebaseAPI !== "undefined" && FirebaseAPI.auth && typeof FirebaseAPI.auth.getCurrentUser === "function")
         ? FirebaseAPI.auth.getCurrentUser()
         : null;
       updateAccountStatusUI(currentUser);
       renderUI();
+        an_init();
       loadMotivationalQuote();
   }
 
@@ -130,8 +200,10 @@
     function loadUserDataAndRender(userId, applications) {
       currentUserId = userId;
       useFirebase = !!userId;
-      if (applications) {
+        if (Array.isArray(applications)) {
         state.applications = applications;
+        } else if (!userId) {
+          state.applications = loadApplications();
       }
       if (typeof FirebaseAPI !== "undefined" && FirebaseAPI.auth && typeof FirebaseAPI.auth.getCurrentUser === "function") {
         updateAccountStatusUI(FirebaseAPI.auth.getCurrentUser());
@@ -142,19 +214,19 @@
   function bindEvents() {
     addListener(DOM.themeToggle, "click", toggleTheme);
     addListener(DOM.accountLogoutBtn, "click", handleLogout);
-    addListener(DOM.analyticsToggleBtn, "click", () => toggleAnalytics());
-    addListener(DOM.analyticsMetricSelect, "change", renderAnalytics);
-    addListener(DOM.analyticsNavBtn, "click", (event) => {
+    addListener(DOM.resetGuestBtn, "click", resetGuestData);
+    addListener(DOM.analyticsBtn, "click", () => an_toggle(true));
+    addListener(DOM.dashboardBtn, "click", (event) => {
       event.preventDefault();
-      toggleAnalytics();
+      an_toggle(false);
     });
     
     // Dashboard navigation
     document.querySelectorAll('.nav-item[data-view="dashboard"]').forEach(btn => {
       addListener(btn, "click", (event) => {
         event.preventDefault();
-        if (state.analyticsExpanded) {
-          toggleAnalytics(false);
+        if (anState.isOpen) {
+          an_toggle(false);
         }
         document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
         btn.classList.add('active');
@@ -183,7 +255,7 @@
     addListener(DOM.goalEditBtn, "click", editWeeklyGoal);
 
     addListener(DOM.searchInput, "input", (e) => {
-      state.searchQuery = e.target.value.trim().toLowerCase();
+      applySearchInput(e.target.value || "");
       renderFilterUI();
       renderKanban();
     });
@@ -195,10 +267,36 @@
 
     addListener(DOM.clearFilterBtn, "click", () => {
       state.currentFilter = "all";
+      state.currentCompanyFilter = "all";
       state.searchQuery = "";
       if (DOM.searchInput) {
         DOM.searchInput.value = "";
       }
+      renderFilterUI();
+      renderKanban();
+    });
+
+    addListener(DOM.companyShortcuts, "click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      const shortcutBtn = target.closest("button[data-company]");
+      const clearBtn = target.closest("button[data-company-clear]");
+
+      if (clearBtn) {
+        state.currentCompanyFilter = "all";
+      }
+
+      if (shortcutBtn) {
+        const company = (shortcutBtn.getAttribute("data-company") || "").trim();
+        if (!company) {
+          return;
+        }
+        state.currentCompanyFilter = state.currentCompanyFilter === company ? "all" : company;
+      }
+
       renderFilterUI();
       renderKanban();
     });
@@ -212,10 +310,17 @@
     if (mainContent) {
       addListener(mainContent, "scroll", handleScrollVisibility);
     }
+    addListener(window, "scroll", handleScrollVisibility);
+    handleScrollVisibility();
 
     document.querySelectorAll(".chip").forEach((chip) => {
       chip.addEventListener("click", () => {
-        state.currentFilter = chip.dataset.stage;
+        const stage = chip.dataset.stage;
+        if (!stage || stage === "all") {
+          state.currentFilter = "all";
+        } else {
+          state.currentFilter = state.currentFilter === stage ? "all" : stage;
+        }
         renderFilterUI();
         renderKanban();
       });
@@ -224,18 +329,7 @@
     document.querySelectorAll(".stat-tile").forEach((tile) => {
       tile.addEventListener("click", () => {
         const filter = tile.dataset.filter;
-        if (filter === "responserate") {
-          showToast("Response rate is calculated automatically", "info");
-          return;
-        }
-        if (filter === "followup") {
-          state.currentFilter = "all";
-          state.searchQuery = "";
-          if (DOM.searchInput) {
-            DOM.searchInput.value = "";
-          }
-          renderFilterUI();
-          renderKanban(true);
+        if (!filter || filter === "responserate") {
           return;
         }
         state.currentFilter = filter === "all" ? "all" : filter;
@@ -254,32 +348,53 @@
 
   function handleScrollVisibility() {
     const mainContent = document.querySelector('.main-content');
-    if (mainContent && DOM.scrollToTopBtn) {
-      if (mainContent.scrollTop > 400) {
-        DOM.scrollToTopBtn.classList.remove('hidden');
-      } else {
-        DOM.scrollToTopBtn.classList.add('hidden');
-      }
+    if (!DOM.scrollToTopBtn) {
+      return;
+    }
+
+    const containerScrollTop = mainContent ? mainContent.scrollTop : 0;
+    const windowScrollTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    const currentScrollTop = Math.max(containerScrollTop, windowScrollTop);
+
+    if (currentScrollTop > SCROLL_TOP_THRESHOLD) {
+      DOM.scrollToTopBtn.classList.remove('hidden');
+    } else {
+      DOM.scrollToTopBtn.classList.add('hidden');
     }
   }
 
   function scrollToTop() {
     const mainContent = document.querySelector('.main-content');
-    if (mainContent) {
+    if (mainContent && mainContent.scrollTop > 0) {
       mainContent.scrollTo({
         top: 0,
         behavior: 'smooth'
       });
     }
+
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
   }
 
   function setupTheme() {
     document.documentElement.setAttribute("data-theme", state.theme);
     DOM.themeIcon.textContent = state.theme === "dark" ? "☀" : "🌙";
+
+    const authThemeIcon = document.getElementById("auth-theme-icon");
+    if (authThemeIcon) {
+      authThemeIcon.textContent = state.theme === "dark" ? "🌙" : "☀";
+    }
+
+    if (anState.isOpen) {
+      an_buildCharts();
+    }
   }
 
   function toggleTheme() {
     state.theme = state.theme === "dark" ? "light" : "dark";
+    safeStorageSet(THEME_KEY, state.theme);
     
       if (useFirebase && currentUserId) {
         FirebaseAPI.db.saveSettings(currentUserId, {
@@ -288,15 +403,22 @@
         }).catch((error) => {
           console.error('Settings save error:', error);
         });
-      } else {
-        safeStorageSet(THEME_KEY, state.theme);
       }
     
     setupTheme();
+    broadcastTheme(state.theme);
     showToast(`Switched to ${state.theme} mode`);
   }
 
   async function handleLogout() {
+    if (!useFirebase || !currentUserId) {
+      if (typeof AuthManager !== "undefined" && typeof AuthManager.exitGuestMode === "function") {
+        AuthManager.exitGuestMode();
+      }
+      showToast("Exited guest mode", "info");
+      return;
+    }
+
     if (typeof FirebaseAPI === "undefined" || !FirebaseAPI.auth) {
       showToast("Firebase not ready yet", "warning");
       return;
@@ -312,649 +434,706 @@
 
   function updateAccountStatusUI(user) {
     if (!DOM.accountStatus) return;
+
+    if (DOM.resetGuestBtn) {
+      DOM.resetGuestBtn.classList.add("hidden");
+    }
+
     if (!user) {
       DOM.accountStatus.textContent = "Signed out";
+      return;
+    }
+    if (user.isGuest) {
+      DOM.accountStatus.textContent = "Guest mode";
+      if (DOM.resetGuestBtn) {
+        DOM.resetGuestBtn.classList.remove("hidden");
+      }
       return;
     }
     DOM.accountStatus.textContent = user.email || "Email account";
   }
 
+  function resetGuestData() {
+    if (useFirebase && currentUserId) {
+      showToast("Reset Guest Data is available only in guest mode", "warning");
+      return;
+    }
+
+    const confirmed = window.confirm("Clear all guest applications from this browser?");
+    if (!confirmed) {
+      return;
+    }
+
+    safeStorageRemove(STORAGE_KEY);
+    state.applications = [];
+    state.currentFilter = "all";
+    state.currentCompanyFilter = "all";
+    state.searchQuery = "";
+    if (DOM.searchInput) {
+      DOM.searchInput.value = "";
+    }
+    renderUI();
+    showToast("Guest data reset", "info");
+  }
+
+  function startGuestMode() {
+    currentUserId = null;
+    useFirebase = false;
+    state.applications = loadApplications();
+    updateAccountStatusUI({ isGuest: true });
+    renderUI();
+    showToast("Guest mode active", "info");
+  }
+
   function renderUI() {
     renderStats();
     renderGoal();
+    renderCompanyShortcuts();
     renderFilterUI();
     renderKanban();
-    syncAnalyticsPanelUI();
-    renderAnalytics();
+    an_refresh();
   }
 
-  function toggleAnalytics(forceValue) {
-    state.analyticsExpanded = typeof forceValue === "boolean" ? forceValue : !state.analyticsExpanded;
-    safeStorageSet(ANALYTICS_KEY, state.analyticsExpanded ? "true" : "false");
-    syncAnalyticsPanelUI();
-    renderAnalytics();
+  function normalizeCompanyKey(value) {
+    return String(value || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "");
   }
 
-  function syncAnalyticsPanelUI() {
-    if (DOM.analyticsPanel) {
-      DOM.analyticsPanel.classList.toggle("hidden", !state.analyticsExpanded);
-    }
-
-    if (DOM.analyticsToggleBtn) {
-      DOM.analyticsToggleBtn.textContent = state.analyticsExpanded ? "▴" : "📈";
-      DOM.analyticsToggleBtn.setAttribute("aria-label", state.analyticsExpanded ? "Hide analytics" : "Show analytics");
-    }
-
-    if (DOM.analyticsNavBtn) {
-      DOM.analyticsNavBtn.classList.toggle("active", state.analyticsExpanded);
-    }
-
-    // Sync dashboard nav button
-    const dashboardNavBtns = document.querySelectorAll('.nav-item[data-view="dashboard"]');
-    dashboardNavBtns.forEach(btn => {
-      btn.classList.toggle("active", !state.analyticsExpanded);
-    });
+  function toShortcutKey(companyName) {
+    const key = normalizeCompanyKey(companyName);
+    return key || "company";
   }
 
-  function renderAnalytics() {
-    if (!state.analyticsExpanded) {
-      return;
-    }
+  function getCompanyShortcutEntries() {
+    const companyCount = new Map();
 
-    if (typeof Chart === "undefined") {
-      showToast("Analytics library not loaded", "warning");
-      return;
-    }
-
-    renderRegressionChart();
-    renderStageChart();
-    renderCompanyStackedChart();
-    renderTrendsChart();
-  }
-
-  function renderRegressionChart() {
-    if (!DOM.analyticsRegressionCanvas) {
-      return;
-    }
-
-    const metric = DOM.analyticsMetricSelect ? DOM.analyticsMetricSelect.value : "stage";
-    let labels = [];
-    let values = [];
-
-    if (metric === "company") {
-      const companyMap = new Map();
-      state.applications.forEach((app) => {
-        const name = (app.company || "Unknown").trim() || "Unknown";
-        companyMap.set(name, (companyMap.get(name) || 0) + 1);
-      });
-
-      const topCompanies = Array.from(companyMap.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 8);
-
-      labels = topCompanies.map((entry) => entry[0]);
-      values = topCompanies.map((entry) => entry[1]);
-    } else {
-      labels = STAGES;
-      values = STAGES.map((stage) => state.applications.filter((app) => app.stage === stage).length);
-    }
-
-    const trend = computeRegressionLine(values);
-
-    if (charts.regression) {
-      charts.regression.destroy();
-    }
-
-    // Create gradient for bars
-    const ctx = DOM.analyticsRegressionCanvas.getContext('2d');
-    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-    gradient.addColorStop(0, 'rgba(99, 102, 241, 0.85)');
-    gradient.addColorStop(1, 'rgba(99, 102, 241, 0.35)');
-
-    charts.regression = new Chart(DOM.analyticsRegressionCanvas, {
-      type: "bar",
-      data: {
-        labels,
-        datasets: [
-          {
-            label: metric === "company" ? "Applications" : "Job status count",
-            data: values,
-            backgroundColor: gradient,
-            borderRadius: 8,
-            barPercentage: 0.75,
-            categoryPercentage: 0.85
-          },
-          {
-            type: "line",
-            label: "Trend Line",
-            data: trend,
-            borderColor: "#ef4444",
-            borderWidth: 2.5,
-            pointRadius: 0,
-            tension: 0.3,
-            borderDash: [5, 5]
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: {
-          mode: 'index',
-          intersect: false
-        },
-        plugins: {
-          legend: { 
-            position: "top",
-            labels: {
-              usePointStyle: true,
-              padding: 15,
-              font: { size: 12, weight: '500' }
-            }
-          },
-          tooltip: {
-            backgroundColor: 'rgba(0, 0, 0, 0.85)',
-            padding: 12,
-            titleFont: { size: 13, weight: 'bold' },
-            bodyFont: { size: 12 },
-            cornerRadius: 8,
-            displayColors: true,
-            callbacks: {
-              title: function(context) {
-                return context[0].label;
-              },
-              label: function(context) {
-                if (context.datasetIndex === 0) {
-                  const count = context.parsed.y;
-                  return ` ${count} application${count !== 1 ? 's' : ''}`;
-                }
-                return ` Trend: ${context.parsed.y.toFixed(1)}`;
-              }
-            }
-          }
-        },
-        scales: {
-          x: {
-            grid: { display: false },
-            ticks: { 
-              font: { size: 11 },
-              maxRotation: 45,
-              minRotation: 0
-            }
-          },
-          y: {
-            beginAtZero: true,
-            ticks: { 
-              precision: 0,
-              font: { size: 11 }
-            },
-            grid: {
-              color: 'rgba(0, 0, 0, 0.05)'
-            }
-          }
-        }
-      }
-    });
-  }
-
-  function renderStageChart() {
-    if (!DOM.analyticsStageCanvas) {
-      return;
-    }
-
-    const values = STAGES.map((stage) => state.applications.filter((app) => app.stage === stage).length);
-    const total = values.reduce((sum, val) => sum + val, 0);
-
-    if (charts.stage) {
-      charts.stage.destroy();
-    }
-
-    // Vibrant cohesive color palette with 3D depth
-    const colors = [
-      "#8b5cf6",  // Wishlist - purple
-      "#6366f1",  // Applied - indigo
-      "#f59e0b",  // OA/Test - amber
-      "#06b6d4",  // Interview - cyan
-      "#ef4444",  // Rejected - red
-      "#10b981"   // Offer - green
-    ];
-
-    const hoverColors = [
-      "#7c3aed",
-      "#4f46e5",
-      "#d97706",
-      "#0891b2",
-      "#dc2626",
-      "#059669"
-    ];
-
-    charts.stage = new Chart(DOM.analyticsStageCanvas, {
-      type: "doughnut",
-      data: {
-        labels: STAGES,
-        datasets: [
-          {
-            data: values,
-            backgroundColor: colors,
-            hoverBackgroundColor: hoverColors,
-            borderWidth: 4,
-            borderColor: '#ffffff',
-            hoverOffset: 15,
-            hoverBorderWidth: 4,
-            spacing: 2
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '68%',
-        plugins: {
-          legend: { 
-            position: "bottom",
-            labels: {
-              usePointStyle: true,
-              pointStyle: 'circle',
-              padding: 15,
-              font: { size: 11, weight: '600' },
-              generateLabels: function(chart) {
-                const data = chart.data;
-                if (data.labels.length && data.datasets.length) {
-                  return data.labels.map((label, i) => {
-                    const value = data.datasets[0].data[i];
-                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-                    return {
-                      text: `${label}: ${value} (${percentage}%)`,
-                      fillStyle: data.datasets[0].backgroundColor[i],
-                      hidden: false,
-                      index: i
-                    };
-                  });
-                }
-                return [];
-              }
-            }
-          },
-          tooltip: {
-            backgroundColor: 'rgba(0, 0, 0, 0.9)',
-            padding: 14,
-            cornerRadius: 10,
-            titleFont: { size: 14, weight: 'bold' },
-            bodyFont: { size: 13 },
-            borderColor: 'rgba(255, 255, 255, 0.1)',
-            borderWidth: 1,
-            callbacks: {
-              label: function(context) {
-                const value = context.parsed;
-                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-                return ` ${value} applications (${percentage}%)`;
-              }
-            }
-          }
-        },
-        animation: {
-          animateRotate: true,
-          animateScale: true,
-          duration: 1000,
-          easing: 'easeInOutQuart'
-        }
-      },
-      plugins: [{
-        id: 'centerText',
-        beforeDraw: function(chart) {
-          if (chart.config.type === 'doughnut') {
-            const ctx = chart.ctx;
-            const centerX = (chart.chartArea.left + chart.chartArea.right) / 2;
-            const centerY = (chart.chartArea.top + chart.chartArea.bottom) / 2;
-            
-            ctx.save();
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            
-            // Draw total number with shadow for depth
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
-            ctx.shadowBlur = 8;
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = 2;
-            ctx.font = 'bold 32px system-ui, -apple-system, sans-serif';
-            ctx.fillStyle = '#1f2937';
-            ctx.fillText(total, centerX, centerY - 10);
-            
-            // Draw label
-            ctx.shadowBlur = 0;
-            ctx.font = '600 13px system-ui, -apple-system, sans-serif';
-            ctx.fillStyle = '#6b7280';
-            ctx.fillText('TOTAL APPS', centerX, centerY + 18);
-            ctx.restore();
-          }
-        }
-      }]
-    });
-  }
-
-  function renderCompanyStackedChart() {
-    if (!DOM.analyticsCompanyCanvas) {
-      return;
-    }
-
-    // Get top companies by application count
-    const companyMap = new Map();
     state.applications.forEach((app) => {
-      const company = (app.company || "Other").trim() || "Other";
-      if (!companyMap.has(company)) {
-        companyMap.set(company, {});
+      const companyName = String(app.company || "").trim();
+      if (!companyName) {
+        return;
       }
-      const stage = app.stage || "Wishlist";
-      const companyData = companyMap.get(company);
-      companyData[stage] = (companyData[stage] || 0) + 1;
+      companyCount.set(companyName, (companyCount.get(companyName) || 0) + 1);
     });
 
-    // Get top 8 companies by total applications
-    const sortedCompanies = Array.from(companyMap.entries())
-      .map(([company, stageData]) => {
-        const total = Object.values(stageData).reduce((sum, count) => sum + count, 0);
-        return { company, stageData, total };
-      })
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 8);
+    DEFAULT_COMPANY_SHORTCUTS.forEach((companyName) => {
+      if (!companyCount.has(companyName)) {
+        companyCount.set(companyName, 0);
+      }
+    });
 
-    const labels = sortedCompanies.map(item => item.company);
-    
-    // Create datasets for each stage
-    const stageColors = {
-      "Wishlist": "#8b5cf6",
-      "Applied": "#6366f1",
-      "OA/Test": "#f59e0b",
-      "Interview": "#06b6d4",
-      "Rejected": "#ef4444",
-      "Offer": "#10b981"
+    return Array.from(companyCount.entries())
+      .sort((a, b) => {
+        if (b[1] !== a[1]) {
+          return b[1] - a[1];
+        }
+        return a[0].localeCompare(b[0]);
+      })
+      .slice(0, 12)
+      .map(([name]) => {
+        const shortcutKey = toShortcutKey(name);
+        const firstWord = String(name).trim().split(/\s+/)[0] || "";
+        return {
+          name,
+          shortcutKey,
+          aliases: [shortcutKey, normalizeCompanyKey(firstWord)]
+        };
+      });
+  }
+
+  function findCompanyByShortcut(rawShortcut) {
+    const shortcut = normalizeCompanyKey(rawShortcut);
+    if (!shortcut) {
+      return "";
+    }
+
+    const hardcodedAliases = {
+      semens: "Siemens",
+      siemen: "Siemens",
+      dhl: "DHL",
+      sap: "SAP"
     };
 
-    const datasets = STAGES.map(stage => ({
-      label: stage,
-      data: sortedCompanies.map(item => item.stageData[stage] || 0),
-      backgroundColor: stageColors[stage],
-      borderRadius: 4,
-      borderSkipped: false
-    }));
-
-    if (charts.company) {
-      charts.company.destroy();
+    if (hardcodedAliases[shortcut]) {
+      return hardcodedAliases[shortcut];
     }
 
-    charts.company = new Chart(DOM.analyticsCompanyCanvas, {
-      type: "bar",
-      data: {
-        labels,
-        datasets
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: {
-          mode: 'index',
-          intersect: false
-        },
-        plugins: {
-          legend: {
-            position: 'top',
-            labels: {
-              usePointStyle: true,
-              pointStyle: 'circle',
-              padding: 12,
-              font: { size: 11, weight: '600' }
-            }
-          },
-          tooltip: {
-            backgroundColor: 'rgba(0, 0, 0, 0.9)',
-            padding: 14,
-            cornerRadius: 10,
-            titleFont: { size: 13, weight: 'bold' },
-            bodyFont: { size: 12 },
-            borderColor: 'rgba(255, 255, 255, 0.1)',
-            borderWidth: 1,
-            callbacks: {
-              footer: function(tooltipItems) {
-                const total = tooltipItems.reduce((sum, item) => sum + item.parsed.y, 0);
-                return `\nTotal: ${total} applications`;
-              }
-            },
-            footerFont: { size: 12, weight: 'bold' },
-            footerColor: '#ffffff'
-          }
-        },
-        scales: {
-          x: {
-            stacked: true,
-            grid: { display: false },
-            ticks: {
-              font: { size: 11, weight: '500' },
-              maxRotation: 45,
-              minRotation: 0
-            }
-          },
-          y: {
-            stacked: true,
-            beginAtZero: true,
-            ticks: {
-              precision: 0,
-              font: { size: 11 }
-            },
-            grid: {
-              color: 'rgba(0, 0, 0, 0.05)'
-            }
-          }
-        }
-      }
-    });
+    const match = getCompanyShortcutEntries().find((entry) =>
+      entry.aliases.includes(shortcut) || entry.shortcutKey.startsWith(shortcut)
+    );
+
+    return match ? match.name : "";
   }
 
-  function renderTrendsChart() {
-    if (!DOM.analyticsTrendsCanvas) {
+  function renderCompanyShortcuts() {
+    if (!DOM.companyShortcuts) {
       return;
     }
 
-    // Calculate success rate trends over the last 8 weeks
-    const labels = [];
-    const successRates = [];
-    const appliedCounts = [];
-    const interviewCounts = [];
-    const now = new Date();
+    const entries = getCompanyShortcutEntries();
+    DOM.companyShortcuts.innerHTML = [
+      `<button type="button" class="company-chip ${state.currentCompanyFilter === "all" ? "active" : ""}" data-company-clear="true" title="Show all companies">All Companies</button>`,
+      ...entries.map((entry) => {
+        const isActive = state.currentCompanyFilter === entry.name;
+        return `<button type="button" class="company-chip ${isActive ? "active" : ""}" data-company="${escapeAttr(entry.name)}" title="Shortcut: \\${escapeAttr(entry.shortcutKey)}">${escapeHtml(entry.name)}</button>`;
+      })
+    ].join("");
+  }
 
-    for (let i = 7; i >= 0; i -= 1) {
-      const weekStart = new Date(now);
-      weekStart.setDate(now.getDate() - (i * 7));
-      weekStart.setHours(0, 0, 0, 0);
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      weekEnd.setHours(23, 59, 59, 999);
+  function applySearchInput(rawInput) {
+    const trimmed = String(rawInput || "").trim();
+    const parts = trimmed.split(/\s+/).filter(Boolean);
+    const firstToken = parts[0] || "";
 
-      const weekApps = state.applications.filter((app) => {
-        if (!app.createdAt) return false;
-        const created = new Date(app.createdAt);
-        return created >= weekStart && created <= weekEnd;
+    if (firstToken.startsWith("\\") && firstToken.length > 1) {
+      const shortcut = firstToken.slice(1);
+      const matchedCompany = findCompanyByShortcut(shortcut);
+      if (matchedCompany) {
+        state.currentCompanyFilter = matchedCompany;
+        state.searchQuery = parts.slice(1).join(" ").toLowerCase();
+        return;
+      }
+    }
+
+    state.searchQuery = trimmed.toLowerCase();
+  }
+
+  function an_stageCode(stage) {
+    const normalized = String(stage || "").trim().toLowerCase();
+    if (normalized === "wishlist") return "W";
+    if (normalized === "applied") return "A";
+    if (normalized === "oa/test" || normalized === "oa / test" || normalized === "oatest") return "O";
+    if (normalized === "interview") return "I";
+    if (normalized === "rejected") return "R";
+    if (normalized === "offer") return "F";
+    return "W";
+  }
+
+  function an_stageLabel(code) {
+    const map = {
+      W: "Wishlist",
+      A: "Applied",
+      O: "OA/Test",
+      I: "Interview",
+      R: "Rejected",
+      F: "Offer"
+    };
+    return map[code] || "Wishlist";
+  }
+
+  function an_stageClass(code) {
+    return ["W", "A", "O", "I", "R", "F"].includes(code) ? code : "W";
+  }
+
+  function an_dateValue(app) {
+    const candidate = app.appliedDate || app.createdAt || app.postingDate || "";
+    if (!candidate) {
+      return "";
+    }
+    const date = new Date(candidate);
+    if (Number.isNaN(date.getTime())) {
+      return "";
+    }
+    return date.toISOString().slice(0, 10);
+  }
+
+  function an_init() {
+    if (anState.initialized || !DOM.analyticsView) {
+      return;
+    }
+
+    const statusItems = [
+      { code: "W", label: "Wishlist", color: "#8b5cf6" },
+      { code: "A", label: "Applied", color: "#6366f1" },
+      { code: "O", label: "OA/Test", color: "#f59e0b" },
+      { code: "I", label: "Interview", color: "#06b6d4" },
+      { code: "R", label: "Rejected", color: "#ef4444" },
+      { code: "F", label: "Offer", color: "#10b981" }
+    ];
+
+    if (DOM.anStatusChecks) {
+      DOM.anStatusChecks.innerHTML = statusItems.map((item) => `
+        <label class="an-s-check" data-code="${item.code}">
+          <input type="checkbox" data-code="${item.code}" checked>
+          <span class="an-s-dot" style="background:${item.color}"></span>
+          <span class="an-s-name">${item.label}</span>
+          <span class="an-s-bar"><span class="an-s-fill" data-fill="${item.code}" style="width:0%;background:${item.color}"></span></span>
+          <span class="an-s-count" data-count="${item.code}">0</span>
+        </label>
+      `).join("");
+
+      addListener(DOM.anStatusChecks, "change", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement)) {
+          return;
+        }
+        const code = target.getAttribute("data-code") || "";
+        if (!code) {
+          return;
+        }
+        if (target.checked) {
+          anState.statuses.add(code);
+        } else {
+          anState.statuses.delete(code);
+        }
+        an_applyFilters();
       });
-
-      const applied = weekApps.filter(app => app.stage === "Applied").length;
-      const interviewed = weekApps.filter(app => 
-        app.stage === "Interview" || app.stage === "Offer"
-      ).length;
-      const successRate = applied > 0 ? ((interviewed / applied) * 100) : 0;
-
-      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-      labels.push(`${monthNames[weekStart.getMonth()]} ${weekStart.getDate()}`);
-      successRates.push(successRate);
-      appliedCounts.push(applied);
-      interviewCounts.push(interviewed);
     }
 
-    if (charts.trends) {
-      charts.trends.destroy();
+    addListener(DOM.anDateFrom, "change", (e) => {
+      anState.from = e.target.value || "";
+      an_applyFilters();
+    });
+    addListener(DOM.anDateTo, "change", (e) => {
+      anState.to = e.target.value || "";
+      an_applyFilters();
+    });
+    addListener(DOM.anCompany, "input", (e) => {
+      anState.company = (e.target.value || "").trim().toLowerCase();
+    });
+    addListener(DOM.anLocation, "input", (e) => {
+      anState.location = (e.target.value || "").trim().toLowerCase();
+    });
+    addListener(DOM.anKeyword, "input", (e) => {
+      anState.keyword = (e.target.value || "").trim().toLowerCase();
+    });
+    addListener(DOM.anSearch, "input", (e) => {
+      anState.search = (e.target.value || "").trim().toLowerCase();
+      an_applyFilters();
+    });
+    addListener(DOM.anSort, "change", (e) => {
+      anState.sort = e.target.value || "deadline";
+      an_applyFilters();
+    });
+    addListener(DOM.anApplyFiltersBtn, "click", () => an_applyFilters());
+    addListener(DOM.anRefreshBtn, "click", () => an_refresh());
+    addListener(DOM.anClearFiltersBtn, "click", an_clearAll);
+
+    addListener(DOM.anTableBody, "click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      const editBtn = target.closest("button[data-edit-id]");
+      if (!editBtn) {
+        return;
+      }
+      const id = editBtn.getAttribute("data-edit-id");
+      if (id) {
+        openModal(id);
+      }
+    });
+
+    addListener(DOM.anExportBtn, "click", an_exportFilteredCSV);
+    window.an_toggle = an_toggle;
+    anState.initialized = true;
+    an_refresh();
+  }
+
+  function an_toggle(forceValue) {
+    const next = typeof forceValue === "boolean" ? forceValue : !anState.isOpen;
+    anState.isOpen = next;
+
+    if (DOM.kanbanView) {
+      DOM.kanbanView.style.display = next ? "none" : "";
+    }
+    if (DOM.analyticsView) {
+      DOM.analyticsView.style.display = next ? "flex" : "none";
+    }
+    if (DOM.analyticsBtn) {
+      DOM.analyticsBtn.classList.toggle("an-active", next);
+    }
+    if (DOM.dashboardBtn) {
+      DOM.dashboardBtn.classList.toggle("active", !next);
     }
 
-    // Create gradients
-    const ctx = DOM.analyticsTrendsCanvas.getContext('2d');
-    
-    const successGradient = ctx.createLinearGradient(0, 0, 0, 300);
-    successGradient.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
-    successGradient.addColorStop(0.7, 'rgba(16, 185, 129, 0.1)');
-    successGradient.addColorStop(1, 'rgba(16, 185, 129, 0.01)');
+    if (next) {
+      an_refresh();
+    }
+  }
 
-    const appliedGradient = ctx.createLinearGradient(0, 0, 0, 300);
-    appliedGradient.addColorStop(0, 'rgba(99, 102, 241, 0.25)');
-    appliedGradient.addColorStop(1, 'rgba(99, 102, 241, 0.01)');
+  function an_refresh() {
+    if (!anState.initialized) {
+      return;
+    }
+    an_applyFilters();
+  }
 
-    charts.trends = new Chart(DOM.analyticsTrendsCanvas, {
-      type: "line",
-      data: {
-        labels,
-        datasets: [
-          {
-            label: "Success Rate (%)",
-            data: successRates,
-            borderColor: "#10b981",
-            backgroundColor: successGradient,
-            fill: true,
-            tension: 0.45,
-            borderWidth: 3,
-            pointRadius: 6,
-            pointHoverRadius: 8,
-            pointBackgroundColor: "#10b981",
-            pointBorderColor: "#ffffff",
-            pointBorderWidth: 2,
-            pointHoverBorderWidth: 3,
-            yAxisID: 'y'
-          },
-          {
-            label: "Applications",
-            data: appliedCounts,
-            borderColor: "#6366f1",
-            backgroundColor: appliedGradient,
-            fill: true,
-            tension: 0.45,
-            borderWidth: 2.5,
-            pointRadius: 5,
-            pointHoverRadius: 7,
-            pointBackgroundColor: "#6366f1",
-            pointBorderColor: "#ffffff",
-            pointBorderWidth: 2,
-            pointHoverBorderWidth: 3,
-            yAxisID: 'y1'
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: {
-          mode: 'index',
-          intersect: false
-        },
-        plugins: {
-          legend: {
-            display: true,
-            position: 'top',
-            labels: {
-              usePointStyle: true,
-              pointStyle: 'circle',
-              padding: 15,
-              font: { size: 12, weight: '600' }
-            }
-          },
-          tooltip: {
-            backgroundColor: 'rgba(0, 0, 0, 0.9)',
-            padding: 14,
-            cornerRadius: 10,
-            titleFont: { size: 13, weight: 'bold' },
-            bodyFont: { size: 12 },
-            borderColor: 'rgba(255, 255, 255, 0.1)',
-            borderWidth: 1,
-            callbacks: {
-              label: function(context) {
-                if (context.datasetIndex === 0) {
-                  return ` Success Rate: ${context.parsed.y.toFixed(1)}%`;
-                } else {
-                  return ` Applications: ${context.parsed.y}`;
-                }
-              }
-            }
-          }
-        },
-        scales: {
-          x: {
-            grid: { display: false },
-            ticks: {
-              font: { size: 11 },
-              maxRotation: 45,
-              minRotation: 0
-            }
-          },
-          y: {
-            type: 'linear',
-            display: true,
-            position: 'left',
-            beginAtZero: true,
-            max: 100,
-            ticks: {
-              callback: function(value) {
-                return value + '%';
-              },
-              font: { size: 11 }
-            },
-            grid: {
-              color: 'rgba(16, 185, 129, 0.1)'
-            },
-            title: {
-              display: true,
-              text: 'Success Rate',
-              font: { size: 11, weight: '600' },
-              color: '#10b981'
-            }
-          },
-          y1: {
-            type: 'linear',
-            display: true,
-            position: 'right',
-            beginAtZero: true,
-            ticks: {
-              precision: 0,
-              font: { size: 11 }
-            },
-            grid: {
-              drawOnChartArea: false
-            },
-            title: {
-              display: true,
-              text: 'Applications',
-              font: { size: 11, weight: '600' },
-              color: '#6366f1'
-            }
-          }
+  function an_applyFilters() {
+    const from = anState.from;
+    const to = anState.to;
+    const company = anState.company;
+    const location = anState.location;
+    const keyword = anState.keyword;
+    const search = anState.search;
+
+    let rows = state.applications.filter((app) => {
+      const code = an_stageCode(app.stage);
+      if (!anState.statuses.has(code)) {
+        return false;
+      }
+
+      const appDate = an_dateValue(app);
+      if (from && (!appDate || appDate < from)) {
+        return false;
+      }
+      if (to && (!appDate || appDate > to)) {
+        return false;
+      }
+
+      const companyText = String(app.company || "").toLowerCase();
+      const locationText = String(app.location || "").toLowerCase();
+      const notesText = String(app.notes || "").toLowerCase();
+      const roleText = String(app.role || "").toLowerCase();
+
+      if (company && !companyText.includes(company)) {
+        return false;
+      }
+      if (location && !locationText.includes(location)) {
+        return false;
+      }
+      if (keyword && !(notesText.includes(keyword) || roleText.includes(keyword))) {
+        return false;
+      }
+      if (search) {
+        const haystack = `${companyText} ${roleText} ${locationText} ${notesText} ${String(app.reqId || "").toLowerCase()}`;
+        if (!haystack.includes(search)) {
+          return false;
         }
       }
+
+      return true;
+    });
+
+    rows = an_sortRows(rows, anState.sort);
+    anState.filtered = rows;
+
+    an_renderStatusMeta(rows);
+    an_renderActiveChips();
+    an_updateStats(rows);
+    an_renderTable(rows);
+    an_buildCharts(rows);
+  }
+
+  function an_sortRows(rows, sort) {
+    const nextRows = [...rows];
+    if (sort === "company") {
+      return nextRows.sort((a, b) => String(a.company || "").localeCompare(String(b.company || "")));
+    }
+    if (sort === "status") {
+      return nextRows.sort((a, b) => an_stageLabel(an_stageCode(a.stage)).localeCompare(an_stageLabel(an_stageCode(b.stage))));
+    }
+    return nextRows.sort((a, b) => an_dateValue(a).localeCompare(an_dateValue(b)));
+  }
+
+  function an_renderStatusMeta(rows) {
+    const counts = { W: 0, A: 0, O: 0, I: 0, R: 0, F: 0 };
+    rows.forEach((app) => {
+      counts[an_stageCode(app.stage)] += 1;
+    });
+    const total = rows.length || 1;
+
+    if (DOM.anStatusChecks) {
+      DOM.anStatusChecks.querySelectorAll("[data-count]").forEach((el) => {
+        const code = el.getAttribute("data-count");
+        el.textContent = String(counts[code] || 0);
+      });
+      DOM.anStatusChecks.querySelectorAll("[data-fill]").forEach((el) => {
+        const code = el.getAttribute("data-fill");
+        const pct = ((counts[code] || 0) / total) * 100;
+        el.style.width = `${Math.max(4, pct)}%`;
+      });
+    }
+
+    if (DOM.anStatusCount) {
+      DOM.anStatusCount.textContent = String(anState.statuses.size);
+    }
+  }
+
+  function an_renderActiveChips() {
+    if (!DOM.anActiveChips) {
+      return;
+    }
+
+    const chips = [];
+    if (anState.statuses.size !== 6) {
+      anState.statuses.forEach((code) => {
+        chips.push(`<span class="an-chip an-chip-${an_stageClass(code)}">${an_stageLabel(code)} <span class="an-x" data-chip="status" data-value="${code}">x</span></span>`);
+      });
+    }
+    if (anState.company) {
+      chips.push(`<span class="an-chip an-chip-neutral">Company: ${escapeHtml(anState.company)} <span class="an-x" data-chip="company">x</span></span>`);
+    }
+    if (anState.location) {
+      chips.push(`<span class="an-chip an-chip-neutral">Location: ${escapeHtml(anState.location)} <span class="an-x" data-chip="location">x</span></span>`);
+    }
+    if (anState.keyword) {
+      chips.push(`<span class="an-chip an-chip-neutral">Keyword: ${escapeHtml(anState.keyword)} <span class="an-x" data-chip="keyword">x</span></span>`);
+    }
+    if (anState.search) {
+      chips.push(`<span class="an-chip an-chip-neutral">Search: ${escapeHtml(anState.search)} <span class="an-x" data-chip="search">x</span></span>`);
+    }
+
+    DOM.anActiveChips.innerHTML = chips.join("") || '<span class="an-td-muted">No active filters</span>';
+
+    DOM.anActiveChips.querySelectorAll(".an-x").forEach((btn) => {
+      addListener(btn, "click", () => {
+        const type = btn.getAttribute("data-chip");
+        const value = btn.getAttribute("data-value") || "";
+        if (type === "status" && value) {
+          anState.statuses.delete(value);
+          const checkbox = DOM.anStatusChecks ? DOM.anStatusChecks.querySelector(`input[data-code="${value}"]`) : null;
+          if (checkbox) checkbox.checked = false;
+        }
+        if (type === "company") {
+          anState.company = "";
+          if (DOM.anCompany) DOM.anCompany.value = "";
+        }
+        if (type === "location") {
+          anState.location = "";
+          if (DOM.anLocation) DOM.anLocation.value = "";
+        }
+        if (type === "keyword") {
+          anState.keyword = "";
+          if (DOM.anKeyword) DOM.anKeyword.value = "";
+        }
+        if (type === "search") {
+          anState.search = "";
+          if (DOM.anSearch) DOM.anSearch.value = "";
+        }
+        an_applyFilters();
+      });
     });
   }
 
-  function computeRegressionLine(values) {
-    if (!values.length) {
+  function an_updateStats(rows) {
+    const byCode = { W: 0, A: 0, O: 0, I: 0, R: 0, F: 0 };
+    rows.forEach((app) => {
+      byCode[an_stageCode(app.stage)] += 1;
+    });
+
+    const active = byCode.W + byCode.A + byCode.O + byCode.I;
+    const responseRate = rows.length ? Math.round(((byCode.I + byCode.F) / rows.length) * 100) : 0;
+    const offerRate = rows.length ? Math.round((byCode.F / rows.length) * 100) : 0;
+
+    if (DOM.anStatTotal) DOM.anStatTotal.textContent = String(rows.length);
+    if (DOM.anStatRate) DOM.anStatRate.textContent = `${responseRate}%`;
+    if (DOM.anStatActive) DOM.anStatActive.textContent = String(active);
+    if (DOM.anStatOffers) DOM.anStatOffers.textContent = String(byCode.F);
+    if (DOM.anStatOfferRate) DOM.anStatOfferRate.textContent = `${offerRate}% offer rate`;
+    if (DOM.anTopCount) DOM.anTopCount.textContent = `${rows.length} rows`;
+    if (DOM.anTableCount) DOM.anTableCount.textContent = String(rows.length);
+  }
+
+  function an_extractKeywords(app) {
+    const raw = String(app.notes || "");
+    if (!raw.trim()) {
       return [];
     }
+    return raw
+      .split(/[;,|]/)
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+  }
 
-    const n = values.length;
-    const sumX = values.reduce((acc, _, idx) => acc + idx, 0);
-    const sumY = values.reduce((acc, val) => acc + val, 0);
-    const sumXY = values.reduce((acc, val, idx) => acc + (idx * val), 0);
-    const sumXX = values.reduce((acc, _, idx) => acc + (idx * idx), 0);
-    const denominator = (n * sumXX) - (sumX * sumX);
-
-    if (denominator === 0) {
-      return [...values];
+  function an_renderTable(rows) {
+    if (!DOM.anTableBody) {
+      return;
     }
 
-    const slope = ((n * sumXY) - (sumX * sumY)) / denominator;
-    const intercept = (sumY - (slope * sumX)) / n;
-    return values.map((_, idx) => Math.max(0, Number((intercept + (slope * idx)).toFixed(2))));
+    if (!rows.length) {
+      DOM.anTableBody.innerHTML = "";
+      if (DOM.anEmpty) DOM.anEmpty.classList.add("show");
+      return;
+    }
+
+    if (DOM.anEmpty) DOM.anEmpty.classList.remove("show");
+
+    DOM.anTableBody.innerHTML = rows.map((app) => {
+      const code = an_stageCode(app.stage);
+      const deadline = app.deadline || an_dateValue(app);
+      const keywords = an_extractKeywords(app);
+      const keywordHtml = keywords.length
+        ? keywords.map((word) => `<span class="an-kw-tag">${escapeHtml(word)}</span>`).join("")
+        : '<span class="an-td-muted">-</span>';
+
+      return `
+        <tr>
+          <td><input type="checkbox" aria-label="Select row" /></td>
+          <td class="an-td-bold">${escapeHtml(app.company || "-")}</td>
+          <td>${escapeHtml(app.role || "-")}</td>
+          <td>${escapeHtml(app.location || "-")}</td>
+          <td><span class="an-badge an-badge-${an_stageClass(code)}"><span class="an-badge-dot"></span>${escapeHtml(an_stageLabel(code))}</span></td>
+          <td><div class="an-kw-tags">${keywordHtml}</div></td>
+          <td>${deadline ? escapeHtml(deadline) : '<span class="an-td-muted">-</span>'}</td>
+          <td>${escapeHtml(app.reqId || "-")}</td>
+          <td>
+            <div class="an-row-acts">
+              <button type="button" class="an-btn an-btn-sm" data-edit-id="${escapeAttr(app.id)}">Edit</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join("");
   }
+
+  function an_buildCharts(rows = anState.filtered) {
+    if (!anState.isOpen || typeof Chart === "undefined") {
+      return;
+    }
+
+    const chartRows = Array.isArray(rows) ? rows : [];
+    const counts = { W: 0, A: 0, O: 0, I: 0, R: 0, F: 0 };
+    chartRows.forEach((app) => {
+      counts[an_stageCode(app.stage)] += 1;
+    });
+
+    if (anCharts.bar) {
+      anCharts.bar.destroy();
+    }
+    if (anCharts.donut) {
+      anCharts.donut.destroy();
+    }
+
+    if (DOM.anBarChart) {
+      anCharts.bar = new Chart(DOM.anBarChart, {
+        type: "bar",
+        data: {
+          labels: ["Wishlist", "Applied", "OA/Test", "Interview", "Rejected", "Offer"],
+          datasets: [{
+            label: "Applications",
+            data: [counts.W, counts.A, counts.O, counts.I, counts.R, counts.F],
+            backgroundColor: ["#8b5cf6", "#6366f1", "#f59e0b", "#06b6d4", "#ef4444", "#10b981"],
+            borderRadius: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+        }
+      });
+    }
+
+    if (DOM.anDonutChart) {
+      const outcomeValues = [counts.I, counts.R, counts.F];
+      anCharts.donut = new Chart(DOM.anDonutChart, {
+        type: "doughnut",
+        data: {
+          labels: ["Interview", "Rejected", "Offer"],
+          datasets: [{
+            data: outcomeValues,
+            backgroundColor: ["#06b6d4", "#ef4444", "#10b981"],
+            borderWidth: 2,
+            borderColor: state.theme === "dark" ? "#10162b" : "#ffffff"
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: "bottom",
+              labels: { usePointStyle: true }
+            }
+          },
+          cutout: "68%"
+        }
+      });
+    }
+  }
+
+  function an_exportFilteredCSV() {
+    const rows = anState.filtered || [];
+    if (!rows.length) {
+      showToast("No filtered rows to export", "warning");
+      return;
+    }
+
+    const headers = ["Company", "Role", "Location", "Stage", "Date", "ReqID", "Notes"];
+    const lines = rows.map((app) => [
+      app.company || "",
+      app.role || "",
+      app.location || "",
+      app.stage || "",
+      an_dateValue(app),
+      app.reqId || "",
+      app.notes || ""
+    ]);
+
+    const csv = [headers, ...lines]
+      .map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `analytics_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast("Analytics CSV exported");
+  }
+
+  function an_quickFilter(type, value) {
+    const normalized = String(value || "").trim();
+    if (!normalized) {
+      return;
+    }
+    if (type === "company") {
+      anState.company = normalized.toLowerCase();
+      if (DOM.anCompany) DOM.anCompany.value = normalized;
+    }
+    if (type === "location") {
+      anState.location = normalized.toLowerCase();
+      if (DOM.anLocation) DOM.anLocation.value = normalized;
+    }
+    if (type === "keyword") {
+      anState.keyword = normalized.toLowerCase();
+      if (DOM.anKeyword) DOM.anKeyword.value = normalized;
+    }
+    an_applyFilters();
+  }
+
+  function an_clearAll() {
+    anState.from = "";
+    anState.to = "";
+    anState.company = "";
+    anState.location = "";
+    anState.keyword = "";
+    anState.search = "";
+    anState.sort = "deadline";
+    anState.statuses = new Set(["W", "A", "O", "I", "R", "F"]);
+
+    if (DOM.anDateFrom) DOM.anDateFrom.value = "";
+    if (DOM.anDateTo) DOM.anDateTo.value = "";
+    if (DOM.anCompany) DOM.anCompany.value = "";
+    if (DOM.anLocation) DOM.anLocation.value = "";
+    if (DOM.anKeyword) DOM.anKeyword.value = "";
+    if (DOM.anSearch) DOM.anSearch.value = "";
+    if (DOM.anSort) DOM.anSort.value = "deadline";
+    if (DOM.anStatusChecks) {
+      DOM.anStatusChecks.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
+        checkbox.checked = true;
+      });
+    }
+
+    an_applyFilters();
+  }
+
+  function an_export() {
+    an_exportFilteredCSV();
+  }
+
+  window.an_toggle = an_toggle;
+  window.an_applyFilters = an_applyFilters;
+  window.an_quickFilter = an_quickFilter;
+  window.an_clearAll = an_clearAll;
+  window.an_export = an_export;
 
   function openModal(editId = null) {
     if (!currentUserId) {
@@ -1822,20 +2001,23 @@
 
   function renderStats() {
     const apps = state.applications;
+    const wishlist = apps.filter((a) => a.stage === "Wishlist").length;
     const applied = apps.filter((a) => a.stage === "Applied").length;
+    const oa = apps.filter((a) => a.stage === "OA/Test").length;
     const interviews = apps.filter((a) => a.stage === "Interview").length;
+    const rejected = apps.filter((a) => a.stage === "Rejected").length;
     const offers = apps.filter((a) => a.stage === "Offer").length;
-    const followupDue = apps.filter((a) => isFollowupDue(a)).length;
     const responseRate = apps.length > 0
       ? Math.round(((interviews + offers) / apps.length) * 100)
       : 0;
 
-    DOM.statTotal.textContent = String(apps.length);
-    DOM.statApplied.textContent = String(applied);
-    DOM.statInterview.textContent = String(interviews);
-    DOM.statOffers.textContent = String(offers);
-    DOM.statFollowup.textContent = String(followupDue);
-    DOM.statResponse.textContent = `${responseRate}%`;
+    if (DOM.statTotal) DOM.statTotal.textContent = String(wishlist);
+    if (DOM.statApplied) DOM.statApplied.textContent = String(applied);
+    if (DOM.statInterview) DOM.statInterview.textContent = String(oa);
+    if (DOM.statOffers) DOM.statOffers.textContent = String(interviews);
+    if (DOM.statFollowup) DOM.statFollowup.textContent = String(rejected);
+    if (DOM.statResponse) DOM.statResponse.textContent = String(offers);
+    if (DOM.statRate) DOM.statRate.textContent = `${responseRate}%`;
   }
 
   function renderGoal() {
@@ -1850,10 +2032,31 @@
       chip.classList.toggle("chip-active", chip.dataset.stage === state.currentFilter);
     });
 
-    if (state.currentFilter !== "all" || state.searchQuery) {
-      const label = state.currentFilter === "all"
-        ? `Search: \"${state.searchQuery}\"`
-        : `Stage: ${state.currentFilter}`;
+    document.querySelectorAll(".company-chip[data-company]").forEach((chip) => {
+      const company = (chip.getAttribute("data-company") || "").trim();
+      chip.classList.toggle("active", company === state.currentCompanyFilter);
+    });
+
+    document.querySelectorAll(".company-chip[data-company-clear]").forEach((chip) => {
+      chip.classList.toggle("active", state.currentCompanyFilter === "all");
+    });
+
+    if (!DOM.activeFilterBar || !DOM.activeFilterLabel) {
+      return;
+    }
+
+    if (state.currentFilter !== "all" || state.currentCompanyFilter !== "all" || state.searchQuery) {
+      const labels = [];
+      if (state.currentFilter !== "all") {
+        labels.push(`Stage: ${state.currentFilter}`);
+      }
+      if (state.currentCompanyFilter !== "all") {
+        labels.push(`Company: ${state.currentCompanyFilter}`);
+      }
+      if (state.searchQuery) {
+        labels.push(`Search: \"${state.searchQuery}\"`);
+      }
+      const label = labels.join(" | ");
       DOM.activeFilterLabel.textContent = label;
       DOM.activeFilterBar.removeAttribute("hidden");
     } else {
@@ -1942,6 +2145,11 @@
     if (deleteBtn) {
       deleteBtn.addEventListener("click", () => deleteApplication(app.id));
     }
+
+    // Quick edit: double-click a card to open it in edit mode.
+    card.addEventListener("dblclick", () => {
+      openModal(app.id);
+    });
 
     card.addEventListener("dragstart", (event) => {
       event.dataTransfer.setData("text/plain", app.id);
@@ -2316,6 +2524,14 @@
       filtered = filtered.filter((app) => app.stage === state.currentFilter);
     }
 
+    if (state.currentCompanyFilter !== "all") {
+      const selectedCompanyKey = normalizeCompanyKey(state.currentCompanyFilter);
+      filtered = filtered.filter((app) => {
+        const appCompanyKey = normalizeCompanyKey(app.company);
+        return appCompanyKey.includes(selectedCompanyKey) || selectedCompanyKey.includes(appCompanyKey);
+      });
+    }
+
     if (state.searchQuery) {
       const q = state.searchQuery;
       filtered = filtered.filter((app) => {
@@ -2552,8 +2768,13 @@
         renderUI();
       },
       setTheme: (theme) => {
+        if (theme !== "light" && theme !== "dark") {
+          return;
+        }
         state.theme = theme;
+        safeStorageSet(THEME_KEY, theme);
         setupTheme();
+        broadcastTheme(theme);
       },
       setWeeklyGoal: (goal) => {
         state.currentWeeklyGoal = goal;
@@ -2563,11 +2784,12 @@
         if (!user) {
           currentUserId = null;
           useFirebase = false;
-          state.applications = [];
+          state.applications = loadApplications();
           renderUI();
         }
         updateAccountStatusUI(user);
       },
+      startGuestMode,
       init: loadUserDataAndRender
     };
 })();
