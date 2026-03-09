@@ -40,8 +40,7 @@ Stages used in the project:
 │  ├─ firebase-config.js
 │  ├─ firebase-config.example.js
 │  └─ firebase-config.local.js
-├─ data/
-└─ tools/
+└─ data/
 ```
 
 ## Quick Start
@@ -54,9 +53,6 @@ npx --yes http-server -p 5500
 
 3. Open:
 - `http://127.0.0.1:5500/index.html`
-
-## Documentation
-- Full academic documentation: `docs/PROJECT_DOCUMENTATION.md`
 
 ## Core Features
 1. Authentication and Session

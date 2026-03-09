@@ -104,6 +104,7 @@
     accountLogoutBtn: document.getElementById("account-logout-btn"),
     importBtn: document.getElementById("import-data-btn"),
     importFileInput: document.getElementById("import-file-input"),
+    templateBtn: document.getElementById("download-template-btn"),
     exportCsvBtn: document.getElementById("export-csv-btn"),
     openModalBtn: document.getElementById("open-modal-btn"),
     quoteShuffle: document.getElementById("quote-shuffle-btn"),
@@ -238,6 +239,7 @@
       }
     });
     addListener(DOM.importFileInput, "change", onImportFileChange);
+    addListener(DOM.templateBtn, "click", downloadImportTemplate);
     addListener(DOM.exportCsvBtn, "click", exportToCSV);
     addListener(DOM.openModalBtn, "click", openModal);
     addListener(DOM.modalBackdrop, "click", (e) => {
@@ -2481,6 +2483,61 @@
     URL.revokeObjectURL(url);
 
     showToast("Exported CSV successfully");
+  }
+
+  function downloadImportTemplate() {
+    const headers = [
+      "Job Link",
+      "Company",
+      "Job Title",
+      "Location",
+      "Req ID",
+      "Job Posting Date",
+      "Applied Date",
+      "Stage",
+      "Self Deadline",
+      "Contact Type",
+      "Contact Name",
+      "Notes"
+    ];
+
+    const filenamePrefix = `job-hunt-hq-template-${new Date().toISOString().slice(0, 10)}`;
+
+    if (typeof window.XLSX !== "undefined") {
+      const worksheet = window.XLSX.utils.aoa_to_sheet([headers]);
+      worksheet["!cols"] = [
+        { wch: 34 },
+        { wch: 22 },
+        { wch: 24 },
+        { wch: 18 },
+        { wch: 16 },
+        { wch: 16 },
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 16 },
+        { wch: 22 },
+        { wch: 34 }
+      ];
+
+      const workbook = window.XLSX.utils.book_new();
+      window.XLSX.utils.book_append_sheet(workbook, worksheet, "Applications");
+      window.XLSX.writeFile(workbook, `${filenamePrefix}.xlsx`);
+      showToast("Downloaded Excel template");
+      return;
+    }
+
+    const csv = headers.map(csvEscape).join(",");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${filenamePrefix}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    showToast("Downloaded CSV template");
   }
 
   function csvEscape(value) {
