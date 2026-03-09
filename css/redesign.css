@@ -14,6 +14,27 @@
   --content-max: 1420px;
 }
 
+/* Theme token bridge: keeps shared component tokens readable in both modes. */
+[data-theme="light"] {
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f3f4f8;
+  --border-default: #d8deee;
+  --border-subtle: #e5e7ef;
+}
+
+[data-theme="dark"] {
+  --text-primary: #e8ecff;
+  --text-secondary: #b8c0db;
+  --text-muted: #98a5d4;
+  --bg-surface: #171d35;
+  --bg-elevated: #1b2343;
+  --border-default: #334273;
+  --border-subtle: #2a335a;
+}
+
 body {
   background: radial-gradient(circle at 20% 0%, #eef2ff 0%, #f8f9fc 45%, #f3f5fb 100%);
   color: var(--text-primary);
@@ -2105,6 +2126,15 @@ body {
   color: #d9e1ff;
 }
 
+[data-theme="dark"] .card-menu button {
+  color: #d9e1ff;
+}
+
+[data-theme="dark"] .card-menu button:hover {
+  background: #1f2a4f;
+  color: #f1f4ff;
+}
+
 [data-theme="dark"] .goal-bar-track {
   background: #202a4d;
   border: 1px solid #334273;
@@ -2168,6 +2198,28 @@ body {
 [data-theme="dark"] .modal-box select option {
   background: #182244;
   color: #e8eeff;
+}
+
+[data-theme="dark"] .modal-box .btn-secondary {
+  background: #1a2342;
+  border-color: #3b4a7f;
+  color: #e8eeff;
+}
+
+[data-theme="dark"] .modal-box .btn-secondary:hover {
+  background: #22305c;
+  border-color: #7f8dff;
+  color: #f4f6ff;
+}
+
+[data-theme="dark"] .modal-box .btn-primary {
+  color: #ffffff;
+}
+
+[data-theme="light"] .modal-box .btn-secondary {
+  background: #f3f4f8;
+  border-color: #d8deee;
+  color: #111827;
 }
 
 /* Analytics view */

@@ -3,6 +3,7 @@
   const GOAL_KEY = "job_hunt_hq_weekly_goal";
   const THEME_KEY = "job_hunt_hq_theme";
   const THEME_EVENT = "jobhunt-theme-changed";
+  const SUBMISSION_LOCKED = false;
 
   const STAGES = ["Wishlist", "Applied", "OA/Test", "Interview", "Rejected", "Offer"];
   const DEFAULT_COMPANY_SHORTCUTS = ["SAP", "Siemens", "DHL"];
@@ -170,6 +171,10 @@
         console.log('⚠️ Offline mode (localStorage)');
         state.applications = loadApplications();
       }
+      if (SUBMISSION_LOCKED) {
+        safeStorageRemove(STORAGE_KEY);
+        state.applications = [];
+      }
       setupTheme();
       bindEvents();
       addListener(window, "storage", (event) => {
@@ -192,6 +197,7 @@
         ? FirebaseAPI.auth.getCurrentUser()
         : null;
       updateAccountStatusUI(currentUser);
+      applySubmissionLockUI();
       renderUI();
         an_init();
       loadMotivationalQuote();
@@ -206,11 +212,33 @@
         } else if (!userId) {
           state.applications = loadApplications();
       }
+      if (SUBMISSION_LOCKED) {
+        state.applications = [];
+      }
       if (typeof FirebaseAPI !== "undefined" && FirebaseAPI.auth && typeof FirebaseAPI.auth.getCurrentUser === "function") {
         updateAccountStatusUI(FirebaseAPI.auth.getCurrentUser());
       }
       renderUI();
     }
+
+  function applySubmissionLockUI() {
+    if (!SUBMISSION_LOCKED) {
+      return;
+    }
+
+    [DOM.openModalBtn, DOM.importBtn, DOM.importFileInput, DOM.resetGuestBtn].forEach((el) => {
+      if (el) {
+        el.disabled = true;
+      }
+    });
+
+    if (DOM.openModalBtn) {
+      DOM.openModalBtn.title = "Locked for submission";
+    }
+    if (DOM.importBtn) {
+      DOM.importBtn.title = "Locked for submission";
+    }
+  }
 
   function bindEvents() {
     addListener(DOM.themeToggle, "click", toggleTheme);
@@ -1138,6 +1166,11 @@
   window.an_export = an_export;
 
   function openModal(editId = null) {
+    if (SUBMISSION_LOCKED) {
+      showToast("App is locked for submission", "info");
+      return;
+    }
+
     if (!currentUserId) {
       showToast("Please sign in first", "warning");
       return;
@@ -1169,7 +1202,7 @@
         </div>
 
         <div id="source-file-panel" style="display:none;">
-          <label for="source-file-input">Attachment (.txt, .csv, .xlsx)</label>
+          <label for="source-file-input">Attachment (single job: .txt, .csv, .xlsx)</label>
           <input type="file" id="source-file-input" accept=".txt,.csv,.xlsx,.xls" />
         </div>
 
@@ -1180,7 +1213,7 @@
           <span class="loader-spinner" aria-hidden="true"></span>
           <span id="extract-loader-text">Fetching job details...</span>
         </div>
-        <small class="text-muted">Step 2 form will open after extraction. If extraction is partial, you can manually edit before saving.</small>
+        <small class="text-muted">Step 2 form will open after extraction for one job. For multiple jobs, use sidebar Import CSV.</small>
       </section>
       `}
 
@@ -1434,6 +1467,9 @@
       if (!rows.length) {
         return null;
       }
+      if (rows.length > 1) {
+        throw new Error("This step supports one job only. Use sidebar Import CSV for bulk files.");
+      }
       return normalizeImportedEntry(rows[0]);
     }
 
@@ -1451,6 +1487,9 @@
       });
       if (!rows.length) {
         return null;
+      }
+      if (rows.length > 1) {
+        throw new Error("This step supports one job only. Use sidebar Import CSV for bulk files.");
       }
       return normalizeImportedEntry(rows[0]);
     }
@@ -1848,6 +1887,12 @@
   }
 
   function saveApplicationFromForm(event) {
+    if (SUBMISSION_LOCKED) {
+      event.preventDefault();
+      showToast("App is locked for submission", "info");
+      return;
+    }
+
     event.preventDefault();
 
     const id = getValue("form-id");
@@ -2194,6 +2239,11 @@
   }
 
   function moveApplicationToStage(appId, targetStage) {
+    if (SUBMISSION_LOCKED) {
+      showToast("App is locked for submission", "info");
+      return;
+    }
+
     const appIndex = state.applications.findIndex((item) => item.id === appId);
     if (appIndex < 0) {
       return;
@@ -2225,6 +2275,11 @@
   }
 
   function deleteApplication(id) {
+    if (SUBMISSION_LOCKED) {
+      showToast("App is locked for submission", "info");
+      return;
+    }
+
     const app = state.applications.find((item) => item.id === id);
     if (!app) {
       return;
@@ -2255,6 +2310,14 @@
   }
 
   async function onImportFileChange(event) {
+    if (SUBMISSION_LOCKED) {
+      showToast("App is locked for submission", "info");
+      if (DOM.importFileInput) {
+        DOM.importFileInput.value = "";
+      }
+      return;
+    }
+
     const [file] = event.target.files || [];
     if (!file) {
       return;
@@ -2319,6 +2382,11 @@
 
   async function parseImportFile(file) {
     const lowerName = file.name.toLowerCase();
+    if (lowerName.endsWith(".txt")) {
+      const text = await file.text();
+      return parseCSVText(text);
+    }
+
     if (lowerName.endsWith(".csv")) {
       const text = await file.text();
       return parseCSVText(text);
@@ -2338,7 +2406,7 @@
       });
     }
 
-    throw new Error("Unsupported file type. Please upload CSV or Excel file.");
+    throw new Error("Unsupported file type. Please upload TXT or CSV file.");
   }
 
   function parseCSVText(text) {
@@ -2821,6 +2889,11 @@
     // ═══════════════════════════════════════════════════════════════
     window.JobHuntApp = {
       setApplications: (applications) => {
+        if (SUBMISSION_LOCKED) {
+          state.applications = [];
+          renderUI();
+          return;
+        }
         state.applications = applications;
         renderUI();
       },
@@ -2841,7 +2914,7 @@
         if (!user) {
           currentUserId = null;
           useFirebase = false;
-          state.applications = loadApplications();
+          state.applications = SUBMISSION_LOCKED ? [] : loadApplications();
           renderUI();
         }
         updateAccountStatusUI(user);
